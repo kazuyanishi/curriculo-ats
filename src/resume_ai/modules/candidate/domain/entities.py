@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import date
+from enum import StrEnum
 
 from resume_ai.core.exceptions import DomainError
 
@@ -112,3 +113,39 @@ class Experience:
             raise DomainError("achievements must be a tuple of Achievement")
         if not all(isinstance(achievement, Achievement) for achievement in self.achievements):
             raise DomainError("achievements must contain only Achievement")
+
+
+class EducationStatus(StrEnum):
+    """Stable status values for an academic education record."""
+
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    INTERRUPTED = "interrupted"
+
+
+@dataclass(frozen=True, slots=True)
+class Education:
+    """An academic education record for a candidate."""
+
+    institution: str
+    course: str
+    status: EducationStatus
+    start_date: date | None = None
+    end_date: date | None = None
+
+    def __post_init__(self) -> None:
+        _require_non_empty("institution", self.institution)
+        _require_non_empty("course", self.course)
+
+        if not isinstance(self.status, EducationStatus):
+            raise DomainError("status must be an EducationStatus")
+        if self.start_date is not None and not isinstance(self.start_date, date):
+            raise DomainError("start_date must be a date or None")
+        if self.end_date is not None and not isinstance(self.end_date, date):
+            raise DomainError("end_date must be a date or None")
+        if (
+            self.start_date is not None
+            and self.end_date is not None
+            and self.end_date < self.start_date
+        ):
+            raise DomainError("end_date cannot be before start_date")
