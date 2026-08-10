@@ -260,3 +260,46 @@ class Certification:
         ):
             if value is not None:
                 _require_non_empty(field_name, value)
+
+
+@dataclass(frozen=True, slots=True)
+class Project:
+    """A professional, academic, or personal project declared by a candidate."""
+
+    name: str
+    description: str
+    start_date: date | None = None
+    end_date: date | None = None
+    technologies: tuple[str, ...] = ()
+    url: str | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.name, str):
+            raise DomainError("name must be a string")
+        if not isinstance(self.description, str):
+            raise DomainError("description must be a string")
+        _require_non_empty("name", self.name)
+        _require_non_empty("description", self.description)
+
+        if self.start_date is not None and not isinstance(self.start_date, date):
+            raise DomainError("start_date must be a date or None")
+        if self.end_date is not None and not isinstance(self.end_date, date):
+            raise DomainError("end_date must be a date or None")
+        if (
+            self.start_date is not None
+            and self.end_date is not None
+            and self.end_date < self.start_date
+        ):
+            raise DomainError("end_date cannot be before start_date")
+
+        if not isinstance(self.technologies, tuple):
+            raise DomainError("technologies must be a tuple of strings")
+        for technology in self.technologies:
+            if not isinstance(technology, str):
+                raise DomainError("technologies must contain only strings")
+            _require_non_empty("technology", technology)
+
+        if self.url is not None:
+            if not isinstance(self.url, str):
+                raise DomainError("url must be a string or None")
+            _require_non_empty("url", self.url)
