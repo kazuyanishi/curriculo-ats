@@ -199,3 +199,30 @@ class Tool:
     def __post_init__(self) -> None:
         _require_non_empty("name", self.name)
         _validate_proficiency_level(self.level)
+
+
+class LanguageLevel(StrEnum):
+    """Self-declared proficiency levels for languages."""
+
+    BASIC = "basic"
+    INTERMEDIATE = "intermediate"
+    ADVANCED = "advanced"
+    FLUENT = "fluent"
+    NATIVE = "native"
+
+
+def _validate_language_level(level: LanguageLevel | None) -> None:
+    if level is not None and not isinstance(level, LanguageLevel):
+        raise DomainError("level must be a LanguageLevel or None")
+
+
+@dataclass(frozen=True, slots=True)
+class Language:
+    """A language declared by a candidate."""
+
+    name: str
+    level: LanguageLevel | None = None
+
+    def __post_init__(self) -> None:
+        _require_non_empty("name", self.name)
+        _validate_language_level(self.level)
