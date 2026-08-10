@@ -13,6 +13,12 @@ def _require_non_blank(value: str) -> str:
     return value
 
 
+def _require_non_blank_if_present(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return _require_non_blank(value)
+
+
 def _validate_email(value: str) -> str:
     _require_non_blank(value)
     local_part, separator, domain = value.partition("@")
@@ -61,9 +67,9 @@ class ProfessionalLinksInput(_InputSchema):
     github: str | None = None
     portfolio: str | None = None
 
-    _validate_linkedin = field_validator("linkedin")(_require_non_blank)
-    _validate_github = field_validator("github")(_require_non_blank)
-    _validate_portfolio = field_validator("portfolio")(_require_non_blank)
+    _validate_linkedin = field_validator("linkedin")(_require_non_blank_if_present)
+    _validate_github = field_validator("github")(_require_non_blank_if_present)
+    _validate_portfolio = field_validator("portfolio")(_require_non_blank_if_present)
 
     def to_domain(self) -> ProfessionalLinks:
         return ProfessionalLinks(
