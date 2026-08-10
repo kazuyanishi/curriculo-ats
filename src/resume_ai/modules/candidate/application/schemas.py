@@ -5,12 +5,20 @@ from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from resume_ai.modules.candidate.domain.entities import (
     Achievement,
     Activity,
+    Certification,
     ContactInfo,
     Education,
     EducationStatus,
     Experience,
+    Language,
+    LanguageLevel,
     PersonalInfo,
     ProfessionalLinks,
+    ProficiencyLevel,
+    Project,
+    Skill,
+    Technology,
+    Tool,
 )
 
 
@@ -45,6 +53,26 @@ def _parse_optional_date_input(value: object) -> date | None:
     if value is None:
         return None
     return _parse_date_input(value)
+
+
+def _reject_language_level_for_proficiency(value: object) -> object:
+    if isinstance(value, LanguageLevel):
+        raise ValueError("language level is not a proficiency level")
+    return value
+
+
+def _reject_proficiency_level_for_language(value: object) -> object:
+    if isinstance(value, ProficiencyLevel):
+        raise ValueError("proficiency level is not a language level")
+    return value
+
+
+def _validate_non_blank_string_tuple(value: tuple[str, ...]) -> tuple[str, ...]:
+    for item in value:
+        if not isinstance(item, str):
+            raise ValueError("items must be non-blank strings")
+        _require_non_blank(item)
+    return value
 
 
 def _validate_email(value: str) -> str:
@@ -184,4 +212,142 @@ class EducationInput(_InputSchema):
             status=self.status,
             start_date=self.start_date,
             end_date=self.end_date,
+        )
+
+
+class SkillInput(_InputSchema):
+    name: str
+    level: ProficiencyLevel | None = None
+
+    _validate_name = field_validator("name")(_require_non_blank)
+    _validate_level_boundary = field_validator("level", mode="before")(
+        _reject_language_level_for_proficiency
+    )
+
+    def to_domain(self) -> Skill:
+        return Skill(name=self.name, level=self.level)
+
+
+class TechnologyInput(_InputSchema):
+    name: str
+    level: ProficiencyLevel | None = None
+
+    _validate_name = field_validator("name")(_require_non_blank)
+    _validate_level_boundary = field_validator("level", mode="before")(
+        _reject_language_level_for_proficiency
+    )
+
+    def to_domain(self) -> Technology:
+        return Technology(name=self.name, level=self.level)
+
+
+class ToolInput(_InputSchema):
+    name: str
+    level: ProficiencyLevel | None = None
+
+    _validate_name = field_validator("name")(_require_non_blank)
+    _validate_level_boundary = field_validator("level", mode="before")(
+        _reject_language_level_for_proficiency
+    )
+
+    def to_domain(self) -> Tool:
+        return Tool(name=self.name, level=self.level)
+
+
+class LanguageInput(_InputSchema):
+    name: str
+    level: LanguageLevel | None = None
+
+    _validate_name = field_validator("name")(_require_non_blank)
+    _validate_level_boundary = field_validator("level", mode="before")(
+        _reject_proficiency_level_for_language
+    )
+
+    def to_domain(self) -> Language:
+        return Language(name=self.name, level=self.level)
+
+
+class CertificationInput(_InputSchema):
+    name: str
+    issuer: str
+    issue_date: date | None = None
+    expiration_date: date | None = None
+    credential_id: str | None = None
+    credential_url: str | None = None
+
+    _validate_name = field_validator("name")(_require_non_blank)
+    _validate_issuer = field_validator("issuer")(_require_non_blank)
+    _parse_issue_date = field_validator("issue_date", mode="before")(
+        _parse_optional_date_input
+    )
+    _parse_expiration_date = field_validator("expiration_date", mode="before")(
+        _parse_optional_date_input
+    )
+    _validate_credential_id = field_validator("credential_id")(
+        _require_non_blank_if_present
+    )
+    _validate_credential_url = field_validator("credential_url")(
+        _require_non_blank_if_present
+    )
+
+    @model_validator(mode="after")
+    def _validate_date_order(self) -> "CertificationInput":
+        if (
+            self.issue_date is not None
+            and self.expiration_date is not None
+            and self.expiration_date < self.issue_date
+        ):
+            raise ValueError("expiration_date cannot be before issue_date")
+        return self
+
+    def to_domain(self) -> Certification:
+        return Certification(
+            name=self.name,
+            issuer=self.issuer,
+            issue_date=self.issue_date,
+            expiration_date=self.expiration_date,
+            credential_id=self.credential_id,
+            credential_url=self.credential_url,
+        )
+
+
+class ProjectInput(_InputSchema):
+    name: str
+    description: str
+    start_date: date | None = None
+    end_date: date | None = None
+    technologies: tuple[str, ...] = ()
+    url: str | None = None
+
+    _validate_name = field_validator("name")(_require_non_blank)
+    _validate_description = field_validator("description")(_require_non_blank)
+    _parse_start_date = field_validator("start_date", mode="before")(
+        _parse_optional_date_input
+    )
+    _parse_end_date = field_validator("end_date", mode="before")(
+        _parse_optional_date_input
+    )
+    _validate_technologies = field_validator("technologies")(
+        _validate_non_blank_string_tuple
+    )
+    _validate_url = field_validator("url")(_require_non_blank_if_present)
+
+    @model_validator(mode="after")
+    def _validate_date_order(self) -> "ProjectInput":
+        if (
+            self.start_date is not None
+            and self.end_date is not None
+            and self.end_date < self.start_date
+        ):
+            raise ValueError("end_date cannot be before start_date")
+        return self
+
+    def to_domain(self) -> Project:
+        return Project(
+            name=self.name,
+            description=self.description,
+            start_date=self.start_date,
+            end_date=self.end_date,
+            technologies=self.technologies,
+            url=self.url,
         )
