@@ -1,7 +1,14 @@
-from pydantic import BaseModel, ConfigDict, field_validator
+from datetime import date, datetime
+
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from resume_ai.modules.candidate.domain.entities import (
+    Achievement,
+    Activity,
     ContactInfo,
+    Education,
+    EducationStatus,
+    Experience,
     PersonalInfo,
     ProfessionalLinks,
 )
@@ -17,6 +24,27 @@ def _require_non_blank_if_present(value: str | None) -> str | None:
     if value is None:
         return None
     return _require_non_blank(value)
+
+
+def _parse_date_input(value: object) -> date:
+    if isinstance(value, datetime):
+        raise ValueError("datetime is not accepted; use a date")
+    if isinstance(value, date):
+        return value
+    if not isinstance(value, str):
+        raise ValueError("date must be a date or YYYY-MM-DD string")
+    if len(value) != 10 or value[4] != "-" or value[7] != "-":
+        raise ValueError("date must use YYYY-MM-DD format")
+    try:
+        return date.fromisoformat(value)
+    except ValueError as error:
+        raise ValueError("date must use YYYY-MM-DD format") from error
+
+
+def _parse_optional_date_input(value: object) -> date | None:
+    if value is None:
+        return None
+    return _parse_date_input(value)
 
 
 def _validate_email(value: str) -> str:
@@ -76,4 +104,84 @@ class ProfessionalLinksInput(_InputSchema):
             linkedin=self.linkedin,
             github=self.github,
             portfolio=self.portfolio,
+        )
+
+
+class ActivityInput(_InputSchema):
+    description: str
+
+    _validate_description = field_validator("description")(_require_non_blank)
+
+    def to_domain(self) -> Activity:
+        return Activity(description=self.description)
+
+
+class AchievementInput(_InputSchema):
+    description: str
+
+    _validate_description = field_validator("description")(_require_non_blank)
+
+    def to_domain(self) -> Achievement:
+        return Achievement(description=self.description)
+
+
+class ExperienceInput(_InputSchema):
+    company: str
+    role: str
+    start_date: date
+    end_date: date | None = None
+    activities: tuple[ActivityInput, ...] = ()
+    achievements: tuple[AchievementInput, ...] = ()
+
+    _validate_company = field_validator("company")(_require_non_blank)
+    _validate_role = field_validator("role")(_require_non_blank)
+    _parse_start_date = field_validator("start_date", mode="before")(_parse_date_input)
+    _parse_end_date = field_validator("end_date", mode="before")(_parse_optional_date_input)
+
+    @model_validator(mode="after")
+    def _validate_date_order(self) -> "ExperienceInput":
+        if self.end_date is not None and self.end_date < self.start_date:
+            raise ValueError("end_date cannot be before start_date")
+        return self
+
+    def to_domain(self) -> Experience:
+        return Experience(
+            company=self.company,
+            role=self.role,
+            start_date=self.start_date,
+            end_date=self.end_date,
+            activities=tuple(activity.to_domain() for activity in self.activities),
+            achievements=tuple(achievement.to_domain() for achievement in self.achievements),
+        )
+
+
+class EducationInput(_InputSchema):
+    institution: str
+    course: str
+    status: EducationStatus
+    start_date: date | None = None
+    end_date: date | None = None
+
+    _validate_institution = field_validator("institution")(_require_non_blank)
+    _validate_course = field_validator("course")(_require_non_blank)
+    _parse_start_date = field_validator("start_date", mode="before")(_parse_optional_date_input)
+    _parse_end_date = field_validator("end_date", mode="before")(_parse_optional_date_input)
+
+    @model_validator(mode="after")
+    def _validate_date_order(self) -> "EducationInput":
+        if (
+            self.start_date is not None
+            and self.end_date is not None
+            and self.end_date < self.start_date
+        ):
+            raise ValueError("end_date cannot be before start_date")
+        return self
+
+    def to_domain(self) -> Education:
+        return Education(
+            institution=self.institution,
+            course=self.course,
+            status=self.status,
+            start_date=self.start_date,
+            end_date=self.end_date,
         )
