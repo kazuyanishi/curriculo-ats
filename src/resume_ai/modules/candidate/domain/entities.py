@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import date
 
 from resume_ai.core.exceptions import DomainError
 
@@ -58,3 +59,56 @@ class ProfessionalLinks:
         ):
             if value is not None and not value.strip():
                 raise DomainError(f"{field_name} cannot be empty")
+
+
+@dataclass(frozen=True, slots=True)
+class Activity:
+    """A responsibility performed during a professional experience."""
+
+    description: str
+
+    def __post_init__(self) -> None:
+        _require_non_empty("description", self.description)
+
+
+@dataclass(frozen=True, slots=True)
+class Achievement:
+    """A professional result or accomplishment."""
+
+    description: str
+
+    def __post_init__(self) -> None:
+        _require_non_empty("description", self.description)
+
+
+@dataclass(frozen=True, slots=True)
+class Experience:
+    """A professional experience held by a candidate."""
+
+    company: str
+    role: str
+    start_date: date
+    end_date: date | None = None
+    activities: tuple[Activity, ...] = ()
+    achievements: tuple[Achievement, ...] = ()
+
+    def __post_init__(self) -> None:
+        _require_non_empty("company", self.company)
+        _require_non_empty("role", self.role)
+
+        if not isinstance(self.start_date, date):
+            raise DomainError("start_date must be a date")
+        if self.end_date is not None and not isinstance(self.end_date, date):
+            raise DomainError("end_date must be a date or None")
+        if self.end_date is not None and self.end_date < self.start_date:
+            raise DomainError("end_date cannot be before start_date")
+
+        if not isinstance(self.activities, tuple):
+            raise DomainError("activities must be a tuple of Activity")
+        if not all(isinstance(activity, Activity) for activity in self.activities):
+            raise DomainError("activities must contain only Activity")
+
+        if not isinstance(self.achievements, tuple):
+            raise DomainError("achievements must be a tuple of Achievement")
+        if not all(isinstance(achievement, Achievement) for achievement in self.achievements):
+            raise DomainError("achievements must contain only Achievement")
