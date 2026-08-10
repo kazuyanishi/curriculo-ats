@@ -149,3 +149,53 @@ class Education:
             and self.end_date < self.start_date
         ):
             raise DomainError("end_date cannot be before start_date")
+
+
+class ProficiencyLevel(StrEnum):
+    """Self-declared proficiency levels for skills and capabilities."""
+
+    BASIC = "basic"
+    INTERMEDIATE = "intermediate"
+    ADVANCED = "advanced"
+    EXPERT = "expert"
+
+
+def _validate_proficiency_level(level: ProficiencyLevel | None) -> None:
+    if level is not None and not isinstance(level, ProficiencyLevel):
+        raise DomainError("level must be a ProficiencyLevel or None")
+
+
+@dataclass(frozen=True, slots=True)
+class Skill:
+    """A professional skill or capability."""
+
+    name: str
+    level: ProficiencyLevel | None = None
+
+    def __post_init__(self) -> None:
+        _require_non_empty("name", self.name)
+        _validate_proficiency_level(self.level)
+
+
+@dataclass(frozen=True, slots=True)
+class Technology:
+    """A technical language, framework, platform, or technology."""
+
+    name: str
+    level: ProficiencyLevel | None = None
+
+    def __post_init__(self) -> None:
+        _require_non_empty("name", self.name)
+        _validate_proficiency_level(self.level)
+
+
+@dataclass(frozen=True, slots=True)
+class Tool:
+    """A software, service, or tool used to perform work."""
+
+    name: str
+    level: ProficiencyLevel | None = None
+
+    def __post_init__(self) -> None:
+        _require_non_empty("name", self.name)
+        _validate_proficiency_level(self.level)
