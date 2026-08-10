@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from enum import StrEnum
 
@@ -303,3 +303,51 @@ class Project:
             if not isinstance(self.url, str):
                 raise DomainError("url must be a string or None")
             _require_non_empty("url", self.url)
+
+
+def _require_tuple_of(field_name: str, value: object, expected_type: type) -> None:
+    if not isinstance(value, tuple):
+        raise DomainError(f"{field_name} must be a tuple")
+    if not all(isinstance(item, expected_type) for item in value):
+        raise DomainError(f"{field_name} contains an invalid item type")
+
+
+@dataclass(frozen=True, slots=True)
+class Candidate:
+    """Aggregate root for the candidate domain model."""
+
+    personal_info: PersonalInfo
+    contact_info: ContactInfo
+    professional_links: ProfessionalLinks = field(default_factory=ProfessionalLinks)
+
+    experiences: tuple[Experience, ...] = ()
+    education: tuple[Education, ...] = ()
+
+    skills: tuple[Skill, ...] = ()
+    technologies: tuple[Technology, ...] = ()
+    tools: tuple[Tool, ...] = ()
+
+    languages: tuple[Language, ...] = ()
+    certifications: tuple[Certification, ...] = ()
+    projects: tuple[Project, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.personal_info, PersonalInfo):
+            raise DomainError("personal_info must be a PersonalInfo")
+        if not isinstance(self.contact_info, ContactInfo):
+            raise DomainError("contact_info must be a ContactInfo")
+        if not isinstance(self.professional_links, ProfessionalLinks):
+            raise DomainError("professional_links must be a ProfessionalLinks")
+
+        collection_types = (
+            ("experiences", self.experiences, Experience),
+            ("education", self.education, Education),
+            ("skills", self.skills, Skill),
+            ("technologies", self.technologies, Technology),
+            ("tools", self.tools, Tool),
+            ("languages", self.languages, Language),
+            ("certifications", self.certifications, Certification),
+            ("projects", self.projects, Project),
+        )
+        for field_name, value, expected_type in collection_types:
+            _require_tuple_of(field_name, value, expected_type)
