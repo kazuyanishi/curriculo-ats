@@ -226,3 +226,37 @@ class Language:
     def __post_init__(self) -> None:
         _require_non_empty("name", self.name)
         _validate_language_level(self.level)
+
+
+@dataclass(frozen=True, slots=True)
+class Certification:
+    """A professional certification declared by a candidate."""
+
+    name: str
+    issuer: str
+    issue_date: date | None = None
+    expiration_date: date | None = None
+    credential_id: str | None = None
+    credential_url: str | None = None
+
+    def __post_init__(self) -> None:
+        _require_non_empty("name", self.name)
+        _require_non_empty("issuer", self.issuer)
+
+        if self.issue_date is not None and not isinstance(self.issue_date, date):
+            raise DomainError("issue_date must be a date or None")
+        if self.expiration_date is not None and not isinstance(self.expiration_date, date):
+            raise DomainError("expiration_date must be a date or None")
+        if (
+            self.issue_date is not None
+            and self.expiration_date is not None
+            and self.expiration_date < self.issue_date
+        ):
+            raise DomainError("expiration_date cannot be before issue_date")
+
+        for field_name, value in (
+            ("credential_id", self.credential_id),
+            ("credential_url", self.credential_url),
+        ):
+            if value is not None:
+                _require_non_empty(field_name, value)
