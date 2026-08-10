@@ -119,6 +119,29 @@ def test_professional_links_input_defaults_to_empty_links() -> None:
     assert domain == ProfessionalLinks()
 
 
+@pytest.mark.parametrize("field", ["linkedin", "github", "portfolio"])
+def test_professional_links_input_accepts_explicit_none(field: str) -> None:
+    schema = ProfessionalLinksInput(**{field: None})
+
+    assert getattr(schema, field) is None
+
+
+def test_professional_links_input_accepts_all_explicit_none_and_preserves_domain() -> None:
+    schema = ProfessionalLinksInput(
+        linkedin=None,
+        github=None,
+        portfolio=None,
+    )
+
+    domain = schema.to_domain()
+
+    assert domain == ProfessionalLinks(
+        linkedin=None,
+        github=None,
+        portfolio=None,
+    )
+
+
 def test_professional_links_input_accepts_partial_links_and_preserves_values() -> None:
     schema = ProfessionalLinksInput(github="https://Example.com/Profile")
 
