@@ -49,9 +49,48 @@ class CriterionImportance(StrEnum):
     UNSPECIFIED = "unspecified"
 
 
+class EducationRequirementStatus(StrEnum):
+    COMPLETED = "completed"
+    IN_PROGRESS = "in_progress"
+
+
 def _require_enum(field_name: str, value: object, expected_type: type) -> None:
     if not isinstance(value, expected_type):
         raise DomainError(f"{field_name} must be a {expected_type.__name__}")
+
+
+@dataclass(frozen=True, slots=True)
+class EducationRequirement:
+    degree_level: str | None = None
+    field_of_study: str | None = None
+    institution: str | None = None
+    acceptable_statuses: tuple[EducationRequirementStatus, ...] = ()
+
+    def __post_init__(self) -> None:
+        for field_name, value in (
+            ("degree_level", self.degree_level),
+            ("field_of_study", self.field_of_study),
+            ("institution", self.institution),
+        ):
+            if value is not None:
+                _require_non_blank(field_name, value)
+
+        if not isinstance(self.acceptable_statuses, tuple):
+            raise DomainError("acceptable_statuses must be a tuple")
+        if not all(
+            isinstance(status, EducationRequirementStatus)
+            for status in self.acceptable_statuses
+        ):
+            raise DomainError(
+                "acceptable_statuses must contain only EducationRequirementStatus"
+            )
+        if (
+            self.degree_level is None
+            and self.field_of_study is None
+            and self.institution is None
+            and not self.acceptable_statuses
+        ):
+            raise DomainError("education requirement must define at least one requirement")
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,12 +99,20 @@ class JobCriterion:
     value: str
     evidence: str
     importance: CriterionImportance = CriterionImportance.UNSPECIFIED
+    education_requirement: EducationRequirement | None = None
 
     def __post_init__(self) -> None:
         _require_enum("category", self.category, CriterionCategory)
         _require_non_blank("value", self.value)
         _require_non_blank("evidence", self.evidence)
         _require_enum("importance", self.importance, CriterionImportance)
+        if self.education_requirement is not None:
+            if not isinstance(self.education_requirement, EducationRequirement):
+                raise DomainError("education_requirement must be an EducationRequirement")
+            if self.category is not CriterionCategory.EDUCATION:
+                raise DomainError(
+                    "education_requirement requires education criterion category"
+                )
 
 
 @dataclass(frozen=True, slots=True)
