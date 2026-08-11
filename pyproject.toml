@@ -9,6 +9,7 @@ description = "AI-assisted ATS resume analyzer and optimizer"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "openai",
     "pydantic>=2.13,<3",
 ]
 
