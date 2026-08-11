@@ -8,6 +8,7 @@ from resume_ai.modules.jobs.domain.entities import JobCriterion
 class MatchStatus(StrEnum):
     MATCHED = "matched"
     NOT_MATCHED = "not_matched"
+    UNSUPPORTED = "unsupported"
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +44,10 @@ class MatchingResult:
         )
 
     @property
+    def unsupported(self) -> tuple[CriterionMatch, ...]:
+        return tuple(match for match in self.matches if match.status is MatchStatus.UNSUPPORTED)
+
+    @property
     def total(self) -> int:
         return len(self.matches)
 
@@ -53,3 +58,7 @@ class MatchingResult:
     @property
     def not_matched_count(self) -> int:
         return len(self.not_matched)
+
+    @property
+    def unsupported_count(self) -> int:
+        return len(self.unsupported)
