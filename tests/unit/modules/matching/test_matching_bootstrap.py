@@ -1,10 +1,7 @@
 import inspect
 from typing import get_type_hints
 
-import pytest
-
 from resume_ai.bootstrap import build_match_candidate_to_job
-from resume_ai.core.exceptions import DomainError
 from resume_ai.modules.candidate.domain.entities import (
     Candidate,
     ContactInfo,
@@ -86,13 +83,33 @@ def test_builder_supports_empty_criteria() -> None:
     assert result.not_matched_count == 0
 
 
-def test_builder_propagates_unsupported_category_error() -> None:
+def test_builder_returns_unsupported_and_continues_processing() -> None:
+    python = _criterion(CriterionCategory.TECHNOLOGY, "Python")
     education = _criterion(CriterionCategory.EDUCATION, "Computer Science")
+    docker = _criterion(CriterionCategory.TOOL, "Docker")
+    experience = _criterion(CriterionCategory.EXPERIENCE, "Backend Developer")
+    english = _criterion(CriterionCategory.LANGUAGE, "English")
+    criteria = JobCriteria(criteria=(python, education, docker, experience, english))
 
-    with pytest.raises(DomainError, match="not supported"):
-        build_match_candidate_to_job().execute(
-            _candidate(), JobCriteria(criteria=(education,))
+    result = build_match_candidate_to_job().execute(_candidate(), criteria)
+
+    assert result.total == 5
+    assert result.matched_count == 3
+    assert result.not_matched_count == 0
+    assert result.unsupported_count == 2
+    assert [match.status for match in result.matches] == [
+        MatchStatus.MATCHED,
+        MatchStatus.UNSUPPORTED,
+        MatchStatus.MATCHED,
+        MatchStatus.UNSUPPORTED,
+        MatchStatus.MATCHED,
+    ]
+    assert all(
+        match.criterion is criterion
+        for match, criterion in zip(
+            result.matches, criteria.criteria, strict=True
         )
+    )
 
 
 def test_builder_returns_independent_service_instances() -> None:
