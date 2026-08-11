@@ -1,8 +1,10 @@
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from resume_ai.modules.jobs.domain.entities import (
     CriterionCategory,
     CriterionImportance,
+    EducationRequirement,
+    EducationRequirementStatus,
     JobCriteria,
     JobCriterion,
     JobPosting,
@@ -62,11 +64,44 @@ def _reject_category_as_importance(value: object) -> object:
     return value
 
 
+class EducationRequirementInput(_InputSchema):
+    degree_level: str | None = None
+    field_of_study: str | None = None
+    institution: str | None = None
+    acceptable_statuses: tuple[EducationRequirementStatus, ...] = ()
+
+    _validate_degree_level = field_validator("degree_level")(_require_non_blank_if_present)
+    _validate_field_of_study = field_validator("field_of_study")(
+        _require_non_blank_if_present
+    )
+    _validate_institution = field_validator("institution")(_require_non_blank_if_present)
+
+    @model_validator(mode="after")
+    def _require_at_least_one_requirement(self) -> "EducationRequirementInput":
+        if (
+            self.degree_level is None
+            and self.field_of_study is None
+            and self.institution is None
+            and not self.acceptable_statuses
+        ):
+            raise ValueError("education requirement must define at least one requirement")
+        return self
+
+    def to_domain(self) -> EducationRequirement:
+        return EducationRequirement(
+            degree_level=self.degree_level,
+            field_of_study=self.field_of_study,
+            institution=self.institution,
+            acceptable_statuses=self.acceptable_statuses,
+        )
+
+
 class JobCriterionInput(_InputSchema):
     category: CriterionCategory
     value: str
     evidence: str
     importance: CriterionImportance = CriterionImportance.UNSPECIFIED
+    education_requirement: EducationRequirementInput | None = None
 
     _validate_category_boundary = field_validator("category", mode="before")(
         _reject_importance_as_category
@@ -77,12 +112,26 @@ class JobCriterionInput(_InputSchema):
     _validate_value = field_validator("value")(_require_non_blank)
     _validate_evidence = field_validator("evidence")(_require_non_blank)
 
+    @model_validator(mode="after")
+    def _validate_education_requirement_category(self) -> "JobCriterionInput":
+        if (
+            self.education_requirement is not None
+            and self.category is not CriterionCategory.EDUCATION
+        ):
+            raise ValueError("education_requirement requires education criterion category")
+        return self
+
     def to_domain(self) -> JobCriterion:
         return JobCriterion(
             category=self.category,
             value=self.value,
             evidence=self.evidence,
             importance=self.importance,
+            education_requirement=(
+                self.education_requirement.to_domain()
+                if self.education_requirement is not None
+                else None
+            ),
         )
 
 
