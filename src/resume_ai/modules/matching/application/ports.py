@@ -1,8 +1,8 @@
 from typing import Protocol
 
 from resume_ai.modules.candidate.domain.entities import Candidate
-from resume_ai.modules.jobs.domain.entities import JobCriteria
-from resume_ai.modules.matching.domain.entities import MatchingResult
+from resume_ai.modules.jobs.domain.entities import JobCriteria, JobCriterion
+from resume_ai.modules.matching.domain.entities import CriterionMatch, MatchingResult
 
 
 class CandidateJobMatcher(Protocol):
@@ -11,4 +11,13 @@ class CandidateJobMatcher(Protocol):
         candidate: Candidate,
         criteria: JobCriteria,
     ) -> MatchingResult:
+        ...
+
+
+class CandidateCriterionMatcher(Protocol):
+    def match(
+        self,
+        candidate: Candidate,
+        criterion: JobCriterion,
+    ) -> CriterionMatch:
         ...
