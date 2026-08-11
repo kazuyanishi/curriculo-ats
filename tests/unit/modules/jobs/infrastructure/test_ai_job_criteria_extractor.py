@@ -8,6 +8,7 @@ from resume_ai.modules.jobs.application.schemas import JobCriteriaInput
 from resume_ai.modules.jobs.domain.entities import (
     CriterionCategory,
     EducationRequirementStatus,
+    EducationRequirementStatusEvidence,
     JobCriteria,
     JobPosting,
 )
@@ -106,6 +107,75 @@ def test_ai_extractor_converts_structured_education_response_to_domain() -> None
     assert criterion.evidence == (
         "Bachelor's degree in Computer Science is required."
     )
+
+
+def test_ai_extractor_converts_in_progress_status_provenance_to_domain() -> None:
+    response = JobCriteriaInput(
+        criteria=[
+            {
+                "category": "education",
+                "value": "Currently pursuing Computer Science",
+                "evidence": (
+                    "Candidates currently pursuing a degree "
+                    "in Computer Science may apply."
+                ),
+                "education_requirement": {
+                    "field_of_study": "Computer Science",
+                    "acceptable_statuses": ["in_progress"],
+                    "status_evidence": [
+                        {
+                            "status": "in_progress",
+                            "evidence": "currently pursuing",
+                        }
+                    ],
+                },
+            }
+        ]
+    )
+
+    result = AIJobCriteriaExtractor(FakeStructuredAIClient(response)).extract(
+        JobPosting(description=response.criteria[0].evidence)
+    )
+
+    status_evidence = result.criteria[0].education_requirement.status_evidence
+    assert isinstance(status_evidence[0], EducationRequirementStatusEvidence)
+    assert status_evidence[0].status is EducationRequirementStatus.IN_PROGRESS
+    assert status_evidence[0].evidence == "currently pursuing"
+
+
+def test_ai_extractor_preserves_independent_provenance_for_both_statuses() -> None:
+    response = JobCriteriaInput(
+        criteria=[
+            {
+                "category": "education",
+                "value": "Graduates and currently enrolled students",
+                "evidence": "Graduates and currently enrolled students may apply.",
+                "education_requirement": {
+                    "acceptable_statuses": ["completed", "in_progress"],
+                    "status_evidence": [
+                        {"status": "completed", "evidence": "Graduates"},
+                        {
+                            "status": "in_progress",
+                            "evidence": "currently enrolled",
+                        },
+                    ],
+                },
+            }
+        ]
+    )
+
+    result = AIJobCriteriaExtractor(FakeStructuredAIClient(response)).extract(
+        JobPosting(description=response.criteria[0].evidence)
+    )
+
+    requirement = result.criteria[0].education_requirement
+    assert requirement is not None
+    assert [
+        (item.status, item.evidence) for item in requirement.status_evidence
+    ] == [
+        (EducationRequirementStatus.COMPLETED, "Graduates"),
+        (EducationRequirementStatus.IN_PROGRESS, "currently enrolled"),
+    ]
 
 
 def test_ai_extractor_calls_client_with_prompts_and_schema() -> None:
