@@ -60,11 +60,22 @@ def _require_enum(field_name: str, value: object, expected_type: type) -> None:
 
 
 @dataclass(frozen=True, slots=True)
+class EducationRequirementStatusEvidence:
+    status: EducationRequirementStatus
+    evidence: str
+
+    def __post_init__(self) -> None:
+        _require_enum("status", self.status, EducationRequirementStatus)
+        _require_non_blank("evidence", self.evidence)
+
+
+@dataclass(frozen=True, slots=True)
 class EducationRequirement:
     degree_level: str | None = None
     field_of_study: str | None = None
     institution: str | None = None
     acceptable_statuses: tuple[EducationRequirementStatus, ...] = ()
+    status_evidence: tuple[EducationRequirementStatusEvidence, ...] = ()
 
     def __post_init__(self) -> None:
         for field_name, value in (
@@ -83,6 +94,19 @@ class EducationRequirement:
         ):
             raise DomainError(
                 "acceptable_statuses must contain only EducationRequirementStatus"
+            )
+        if not isinstance(self.status_evidence, tuple):
+            raise DomainError("status_evidence must be a tuple")
+        if not all(
+            isinstance(item, EducationRequirementStatusEvidence)
+            for item in self.status_evidence
+        ):
+            raise DomainError(
+                "status_evidence must contain only EducationRequirementStatusEvidence"
+            )
+        if any(item.status not in self.acceptable_statuses for item in self.status_evidence):
+            raise DomainError(
+                "status_evidence status must be an acceptable education status"
             )
         if (
             self.degree_level is None
