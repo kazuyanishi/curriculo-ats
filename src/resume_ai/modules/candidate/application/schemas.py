@@ -1,10 +1,11 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from resume_ai.modules.candidate.domain.entities import (
     Achievement,
     Activity,
+    Candidate,
     Certification,
     ContactInfo,
     Education,
@@ -350,4 +351,38 @@ class ProjectInput(_InputSchema):
             end_date=self.end_date,
             technologies=self.technologies,
             url=self.url,
+        )
+
+
+class CandidateInput(_InputSchema):
+    personal_info: PersonalInfoInput
+    contact_info: ContactInfoInput
+    professional_links: ProfessionalLinksInput = Field(
+        default_factory=ProfessionalLinksInput
+    )
+
+    experiences: tuple[ExperienceInput, ...] = ()
+    education: tuple[EducationInput, ...] = ()
+
+    skills: tuple[SkillInput, ...] = ()
+    technologies: tuple[TechnologyInput, ...] = ()
+    tools: tuple[ToolInput, ...] = ()
+
+    languages: tuple[LanguageInput, ...] = ()
+    certifications: tuple[CertificationInput, ...] = ()
+    projects: tuple[ProjectInput, ...] = ()
+
+    def to_domain(self) -> Candidate:
+        return Candidate(
+            personal_info=self.personal_info.to_domain(),
+            contact_info=self.contact_info.to_domain(),
+            professional_links=self.professional_links.to_domain(),
+            experiences=tuple(item.to_domain() for item in self.experiences),
+            education=tuple(item.to_domain() for item in self.education),
+            skills=tuple(item.to_domain() for item in self.skills),
+            technologies=tuple(item.to_domain() for item in self.technologies),
+            tools=tuple(item.to_domain() for item in self.tools),
+            languages=tuple(item.to_domain() for item in self.languages),
+            certifications=tuple(item.to_domain() for item in self.certifications),
+            projects=tuple(item.to_domain() for item in self.projects),
         )
