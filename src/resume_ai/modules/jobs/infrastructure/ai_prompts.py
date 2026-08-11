@@ -38,7 +38,9 @@ requirements. Use other as the fallback when no specific category applies.
 
 Education extraction:
 - When category is education, education_requirement may contain only these
-  fields: degree_level, field_of_study, institution, and acceptable_statuses.
+  fields: degree_level, field_of_study, institution, acceptable_statuses, and
+  status_evidence. Each status_evidence item must contain exactly status and
+  evidence.
 - Fill each field only when it is explicitly supported by the same literal
   evidence. Do not infer a degree level, field, institution, or status from
   general knowledge or from an ambiguous phrase.
@@ -51,6 +53,16 @@ Education extraction:
   in_progress only when study in progress is explicit, completed only when
   completion is explicit, both only when both are explicitly accepted, and an
   empty list when status is not specified.
+- Each status_evidence.status must be present in acceptable_statuses. Every
+  distinct acceptable status produced must have at least one corresponding
+  status_evidence item. If no literal supporting phrase exists, omit that
+  status instead of inventing evidence. When status is not specified, return
+  both acceptable_statuses and status_evidence as empty lists.
+- status_evidence.evidence must be the smallest sufficient phrase copied
+  literally and verbatim from the criterion evidence. Never paraphrase,
+  translate, normalize, or invent it; preserve its exact case and punctuation.
+  For example, "Graduates" and "currently enrolled" are independent literal
+  evidence for completed and in_progress when both statuses are accepted.
 - Do not create an empty education_requirement object. Use null when no field
   can be structured faithfully, when the requirement contains related field or
   another unrepresentable qualifier, or when education is an alternative to

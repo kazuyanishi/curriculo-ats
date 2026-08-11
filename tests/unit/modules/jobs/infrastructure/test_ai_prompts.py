@@ -80,6 +80,9 @@ def test_job_criteria_system_prompt_documents_education_structure() -> None:
         "field_of_study",
         "institution",
         "acceptable_statuses",
+        "status_evidence",
+        "status",
+        "evidence",
     ):
         assert field in prompt
 
@@ -101,6 +104,37 @@ def test_job_criteria_system_prompt_requires_conservative_education_grounding() 
     assert "same literal" in prompt
     assert "related field" in prompt
     assert "use null" in prompt
+
+
+def test_job_criteria_system_prompt_requires_status_evidence_association() -> None:
+    prompt = JOB_CRITERIA_SYSTEM_PROMPT.lower()
+
+    assert "status_evidence.status must be present in acceptable_statuses" in prompt
+    assert "every" in prompt
+    assert "distinct acceptable status produced" in prompt
+    assert "corresponding" in prompt
+    assert "status_evidence item" in prompt
+    assert "status_evidence.evidence" in prompt
+    assert "criterion evidence" in prompt
+    assert "literally and verbatim" in prompt
+
+
+def test_job_criteria_system_prompt_documents_empty_status_provenance() -> None:
+    prompt = JOB_CRITERIA_SYSTEM_PROMPT.lower()
+
+    assert "when status is not specified" in prompt
+    assert "both acceptable_statuses and status_evidence as empty lists" in prompt
+    assert "omit that" in prompt
+    assert "instead of inventing evidence" in prompt
+
+
+def test_job_criteria_system_prompt_documents_independent_status_evidence() -> None:
+    prompt = JOB_CRITERIA_SYSTEM_PROMPT.lower()
+
+    assert "graduat" in prompt
+    assert "currently enrolled" in prompt
+    assert "independent literal" in prompt
+    assert "evidence for completed and in_progress" in prompt
 
 
 def test_job_criteria_system_prompt_requires_null_for_non_education() -> None:
