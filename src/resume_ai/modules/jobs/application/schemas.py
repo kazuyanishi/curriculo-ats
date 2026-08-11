@@ -5,6 +5,7 @@ from resume_ai.modules.jobs.domain.entities import (
     CriterionImportance,
     EducationRequirement,
     EducationRequirementStatus,
+    EducationRequirementStatusEvidence,
     JobCriteria,
     JobCriterion,
     JobPosting,
@@ -69,6 +70,7 @@ class EducationRequirementInput(_InputSchema):
     field_of_study: str | None = None
     institution: str | None = None
     acceptable_statuses: tuple[EducationRequirementStatus, ...] = ()
+    status_evidence: tuple["EducationRequirementStatusEvidenceInput", ...] = ()
 
     _validate_degree_level = field_validator("degree_level")(_require_non_blank_if_present)
     _validate_field_of_study = field_validator("field_of_study")(
@@ -87,12 +89,33 @@ class EducationRequirementInput(_InputSchema):
             raise ValueError("education requirement must define at least one requirement")
         return self
 
+    @model_validator(mode="after")
+    def _validate_status_evidence_association(self) -> "EducationRequirementInput":
+        acceptable_statuses = set(self.acceptable_statuses)
+        if any(item.status not in acceptable_statuses for item in self.status_evidence):
+            raise ValueError("status evidence must use an acceptable status")
+        return self
+
     def to_domain(self) -> EducationRequirement:
         return EducationRequirement(
             degree_level=self.degree_level,
             field_of_study=self.field_of_study,
             institution=self.institution,
             acceptable_statuses=self.acceptable_statuses,
+            status_evidence=tuple(item.to_domain() for item in self.status_evidence),
+        )
+
+
+class EducationRequirementStatusEvidenceInput(_InputSchema):
+    status: EducationRequirementStatus
+    evidence: str
+
+    _validate_evidence = field_validator("evidence")(_require_non_blank)
+
+    def to_domain(self) -> EducationRequirementStatusEvidence:
+        return EducationRequirementStatusEvidence(
+            status=self.status,
+            evidence=self.evidence,
         )
 
 
