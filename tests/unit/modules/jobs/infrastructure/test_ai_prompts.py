@@ -71,6 +71,54 @@ def test_job_criteria_system_prompt_distinguishes_tools_from_skills() -> None:
     assert "do not use skill merely" in prompt
 
 
+def test_job_criteria_system_prompt_documents_education_structure() -> None:
+    prompt = JOB_CRITERIA_SYSTEM_PROMPT.lower()
+
+    for field in (
+        "education_requirement",
+        "degree_level",
+        "field_of_study",
+        "institution",
+        "acceptable_statuses",
+    ):
+        assert field in prompt
+
+
+def test_job_criteria_system_prompt_documents_allowed_education_statuses() -> None:
+    prompt = JOB_CRITERIA_SYSTEM_PROMPT.lower()
+
+    assert "completed" in prompt
+    assert "in_progress" in prompt
+    assert "only completed and in_progress" in prompt
+    assert "status is not specified" in prompt
+
+
+def test_job_criteria_system_prompt_requires_conservative_education_grounding() -> None:
+    prompt = JOB_CRITERIA_SYSTEM_PROMPT.lower()
+
+    assert "do not infer" in prompt
+    assert "explicitly supported" in prompt
+    assert "same literal" in prompt
+    assert "related field" in prompt
+    assert "use null" in prompt
+
+
+def test_job_criteria_system_prompt_requires_null_for_non_education() -> None:
+    prompt = JOB_CRITERIA_SYSTEM_PROMPT.lower()
+
+    assert "other than education" in prompt
+    assert "education_requirement must be null" in prompt
+
+
+def test_job_criteria_system_prompt_rejects_empty_and_or_education_structures() -> None:
+    prompt = JOB_CRITERIA_SYSTEM_PROMPT.lower()
+
+    assert "do not create an empty education_requirement object" in prompt
+    assert "education is an alternative to" in prompt
+    assert "experience" in prompt
+    assert "never turn education or experience into two mandatory criteria" in prompt
+
+
 def test_user_prompt_preserves_description_and_excludes_metadata() -> None:
     description = "  Desenvolvedor Python\r\n\r\nRequisitos:\n- Python  "
     job = JobPosting(

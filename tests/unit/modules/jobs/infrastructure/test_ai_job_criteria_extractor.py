@@ -5,7 +5,12 @@ import pytest
 from resume_ai.integrations.ai.client import StructuredAIClient
 from resume_ai.modules.jobs.application.ports import JobCriteriaExtractor
 from resume_ai.modules.jobs.application.schemas import JobCriteriaInput
-from resume_ai.modules.jobs.domain.entities import JobCriteria, JobPosting
+from resume_ai.modules.jobs.domain.entities import (
+    CriterionCategory,
+    EducationRequirementStatus,
+    JobCriteria,
+    JobPosting,
+)
 from resume_ai.modules.jobs.infrastructure.ai_extractor import AIJobCriteriaExtractor
 from resume_ai.modules.jobs.infrastructure.ai_prompts import JOB_CRITERIA_SYSTEM_PROMPT
 
@@ -66,6 +71,41 @@ def test_ai_extractor_converts_response_to_domain() -> None:
     assert isinstance(result, JobCriteria)
     assert result.criteria[0].value == "Python"
     assert result.criteria[0].evidence == "Python is required."
+
+
+def test_ai_extractor_converts_structured_education_response_to_domain() -> None:
+    response = JobCriteriaInput(
+        criteria=[
+            {
+                "category": "education",
+                "value": "Bachelor's degree in Computer Science",
+                "evidence": "Bachelor's degree in Computer Science is required.",
+                "importance": "required",
+                "education_requirement": {
+                    "degree_level": "Bachelor's",
+                    "field_of_study": "Computer Science",
+                    "acceptable_statuses": ["completed"],
+                },
+            }
+        ]
+    )
+    job = JobPosting(
+        description="Bachelor's degree in Computer Science is required."
+    )
+
+    result = AIJobCriteriaExtractor(FakeStructuredAIClient(response)).extract(job)
+
+    criterion = result.criteria[0]
+    requirement = criterion.education_requirement
+    assert criterion.category is CriterionCategory.EDUCATION
+    assert requirement is not None
+    assert requirement.degree_level == "Bachelor's"
+    assert requirement.field_of_study == "Computer Science"
+    assert requirement.institution is None
+    assert requirement.acceptable_statuses == (EducationRequirementStatus.COMPLETED,)
+    assert criterion.evidence == (
+        "Bachelor's degree in Computer Science is required."
+    )
 
 
 def test_ai_extractor_calls_client_with_prompts_and_schema() -> None:
