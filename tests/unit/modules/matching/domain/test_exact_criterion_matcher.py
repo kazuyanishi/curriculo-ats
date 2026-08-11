@@ -2,7 +2,6 @@ from datetime import date
 
 import pytest
 
-from resume_ai.core.exceptions import DomainError
 from resume_ai.modules.candidate.domain.entities import (
     Activity,
     Candidate,
@@ -144,9 +143,13 @@ def test_categories_are_isolated() -> None:
     "category",
     [CriterionCategory.EDUCATION, CriterionCategory.EXPERIENCE, CriterionCategory.OTHER],
 )
-def test_unsupported_categories_raise_domain_error(category: CriterionCategory) -> None:
-    with pytest.raises(DomainError, match="not supported"):
-        ExactCandidateCriterionMatcher().match(_candidate(), _criterion(category, "Python"))
+def test_unsupported_categories_return_unsupported_status(category: CriterionCategory) -> None:
+    criterion = _criterion(category, "Example")
+
+    result = ExactCandidateCriterionMatcher().match(_candidate(), criterion)
+
+    assert result.status is MatchStatus.UNSUPPORTED
+    assert result.criterion is criterion
 
 
 def test_project_technologies_are_not_consulted() -> None:
