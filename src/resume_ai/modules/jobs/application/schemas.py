@@ -1,5 +1,13 @@
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from resume_ai.modules.jobs.domain.entities import (
+    CriterionCategory,
+    CriterionImportance,
+    JobCriteria,
+    JobCriterion,
+    JobPosting,
+)
+
 
 def _require_non_blank(value: str) -> str:
     if not value.strip():
@@ -31,3 +39,55 @@ class JobPostingInput(_InputSchema):
     _validate_company = field_validator("company")(_require_non_blank_if_present)
     _validate_location = field_validator("location")(_require_non_blank_if_present)
     _validate_source_url = field_validator("source_url")(_require_non_blank_if_present)
+
+    def to_domain(self) -> JobPosting:
+        return JobPosting(
+            description=self.description,
+            title=self.title,
+            company=self.company,
+            location=self.location,
+            source_url=self.source_url,
+        )
+
+
+def _reject_importance_as_category(value: object) -> object:
+    if isinstance(value, CriterionImportance):
+        raise ValueError("criterion importance is not a category")
+    return value
+
+
+def _reject_category_as_importance(value: object) -> object:
+    if isinstance(value, CriterionCategory):
+        raise ValueError("criterion category is not an importance")
+    return value
+
+
+class JobCriterionInput(_InputSchema):
+    category: CriterionCategory
+    value: str
+    evidence: str
+    importance: CriterionImportance = CriterionImportance.UNSPECIFIED
+
+    _validate_category_boundary = field_validator("category", mode="before")(
+        _reject_importance_as_category
+    )
+    _validate_importance_boundary = field_validator("importance", mode="before")(
+        _reject_category_as_importance
+    )
+    _validate_value = field_validator("value")(_require_non_blank)
+    _validate_evidence = field_validator("evidence")(_require_non_blank)
+
+    def to_domain(self) -> JobCriterion:
+        return JobCriterion(
+            category=self.category,
+            value=self.value,
+            evidence=self.evidence,
+            importance=self.importance,
+        )
+
+
+class JobCriteriaInput(_InputSchema):
+    criteria: tuple[JobCriterionInput, ...] = ()
+
+    def to_domain(self) -> JobCriteria:
+        return JobCriteria(criteria=tuple(item.to_domain() for item in self.criteria))
