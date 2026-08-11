@@ -25,7 +25,11 @@ def _criterion(value: str = "Python") -> JobCriterion:
 
 
 def test_match_status_has_only_the_supported_values() -> None:
-    assert [status.value for status in MatchStatus] == ["matched", "not_matched"]
+    assert [status.value for status in MatchStatus] == [
+        "matched",
+        "not_matched",
+        "unsupported",
+    ]
 
 
 @pytest.mark.parametrize("status", MatchStatus)
@@ -50,7 +54,7 @@ def test_criterion_match_rejects_invalid_criterion(criterion: object) -> None:
         CriterionMatch(criterion, MatchStatus.MATCHED)  # type: ignore[arg-type]
 
 
-@pytest.mark.parametrize("status", ["matched", None])
+@pytest.mark.parametrize("status", ["matched", "unsupported", None])
 def test_criterion_match_rejects_invalid_status(status: object) -> None:
     with pytest.raises(DomainError):
         CriterionMatch(_criterion(), status)  # type: ignore[arg-type]
@@ -62,23 +66,39 @@ def test_matching_result_empty_defaults_and_counts_are_zero() -> None:
     assert result.matches == ()
     assert result.matched == ()
     assert result.not_matched == ()
+    assert result.unsupported == ()
     assert result.total == 0
     assert result.matched_count == 0
     assert result.not_matched_count == 0
+    assert result.unsupported_count == 0
 
 
 def test_matching_result_filters_statuses_and_preserves_order() -> None:
     python = CriterionMatch(_criterion("Python"), MatchStatus.MATCHED)
     fastapi = CriterionMatch(_criterion("FastAPI"), MatchStatus.MATCHED)
     docker = CriterionMatch(_criterion("Docker"), MatchStatus.NOT_MATCHED)
+    education = CriterionMatch(_criterion("Education"), MatchStatus.UNSUPPORTED)
     english = CriterionMatch(_criterion("English"), MatchStatus.MATCHED)
-    result = MatchingResult(matches=(python, fastapi, docker, english))
+    result = MatchingResult(matches=(python, fastapi, education, docker, english))
 
-    assert result.total == 4
+    assert result.total == 5
     assert result.matched_count == 3
     assert result.not_matched_count == 1
+    assert result.unsupported_count == 1
     assert result.matched == (python, fastapi, english)
     assert result.not_matched == (docker,)
+    assert result.unsupported == (education,)
+
+
+def test_matching_result_unsupported_preserves_relative_order() -> None:
+    unsupported_a = CriterionMatch(_criterion("Education"), MatchStatus.UNSUPPORTED)
+    matched = CriterionMatch(_criterion("Python"), MatchStatus.MATCHED)
+    unsupported_b = CriterionMatch(_criterion("Experience"), MatchStatus.UNSUPPORTED)
+    not_matched = CriterionMatch(_criterion("Docker"), MatchStatus.NOT_MATCHED)
+    result = MatchingResult(matches=(unsupported_a, matched, unsupported_b, not_matched))
+
+    assert result.unsupported == (unsupported_a, unsupported_b)
+    assert result.unsupported_count == 2
 
 
 def test_matching_result_rejects_a_list() -> None:
