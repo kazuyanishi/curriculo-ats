@@ -9,6 +9,9 @@ from resume_ai.modules.jobs.application.services import ExtractJobCriteria, Load
 from resume_ai.modules.jobs.domain.services import JobCriteriaTruthGate
 from resume_ai.modules.jobs.infrastructure.ai_extractor import AIJobCriteriaExtractor
 from resume_ai.modules.jobs.infrastructure.text_repository import TextJobRepository
+from resume_ai.modules.matching.application.matchers import DeterministicCandidateJobMatcher
+from resume_ai.modules.matching.application.services import MatchCandidateToJob
+from resume_ai.modules.matching.domain.services import ExactCandidateCriterionMatcher
 
 
 def build_load_candidate(config: AppConfig) -> LoadCandidate:
@@ -28,3 +31,9 @@ def build_extract_job_criteria(config: AIConfig) -> ExtractJobCriteria:
     extractor = AIJobCriteriaExtractor(client)
     truth_gate = JobCriteriaTruthGate()
     return ExtractJobCriteria(extractor, truth_gate)
+
+
+def build_match_candidate_to_job() -> MatchCandidateToJob:
+    criterion_matcher = ExactCandidateCriterionMatcher()
+    matcher = DeterministicCandidateJobMatcher(criterion_matcher)
+    return MatchCandidateToJob(matcher)
