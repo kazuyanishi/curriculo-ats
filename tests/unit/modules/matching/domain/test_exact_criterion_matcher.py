@@ -1,13 +1,18 @@
+from datetime import date
+
 import pytest
 
 from resume_ai.core.exceptions import DomainError
 from resume_ai.modules.candidate.domain.entities import (
+    Activity,
     Candidate,
     Certification,
     ContactInfo,
+    Experience,
     Language,
     PersonalInfo,
     ProficiencyLevel,
+    Project,
     Skill,
     Technology,
     Tool,
@@ -29,6 +34,8 @@ def _candidate(
     tools: tuple[Tool, ...] = (),
     languages: tuple[Language, ...] = (),
     certifications: tuple[Certification, ...] = (),
+    experiences: tuple[Experience, ...] = (),
+    projects: tuple[Project, ...] = (),
 ) -> Candidate:
     return Candidate(
         personal_info=PersonalInfo(
@@ -43,6 +50,8 @@ def _candidate(
         tools=tools,
         languages=languages,
         certifications=certifications,
+        experiences=experiences,
+        projects=projects,
     )
 
 
@@ -140,8 +149,36 @@ def test_unsupported_categories_raise_domain_error(category: CriterionCategory) 
         ExactCandidateCriterionMatcher().match(_candidate(), _criterion(category, "Python"))
 
 
-def test_projects_and_experiences_are_not_consulted() -> None:
-    candidate = _candidate()
+def test_project_technologies_are_not_consulted() -> None:
+    candidate = _candidate(
+        technologies=(),
+        projects=(
+            Project(
+                name="Backend API",
+                description="Example project",
+                technologies=("Python",),
+            ),
+        ),
+    )
+    criterion = _criterion(CriterionCategory.TECHNOLOGY, "Python")
+
+    result = ExactCandidateCriterionMatcher().match(candidate, criterion)
+
+    assert result.status is MatchStatus.NOT_MATCHED
+
+
+def test_experience_text_is_not_consulted() -> None:
+    candidate = _candidate(
+        technologies=(),
+        experiences=(
+            Experience(
+                company="Example Systems",
+                role="Backend Developer",
+                start_date=date(2024, 1, 1),
+                activities=(Activity("Developed APIs using Python and FastAPI"),),
+            ),
+        ),
+    )
     criterion = _criterion(CriterionCategory.TECHNOLOGY, "Python")
 
     result = ExactCandidateCriterionMatcher().match(candidate, criterion)
