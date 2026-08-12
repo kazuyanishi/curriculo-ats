@@ -23,6 +23,7 @@ from resume_ai.modules.matching.domain.entities import CriterionMatch, MatchStat
 from resume_ai.modules.matching.domain.services import (
     ExactCandidateCriterionMatcher,
     ExperienceCandidateCriterionMatcher,
+    complete_calendar_months,
 )
 
 
@@ -82,7 +83,21 @@ def test_unsupported_category_or_missing_requirement_is_unsupported(
     assert result.status is MatchStatus.UNSUPPORTED
 
 
-def test_minimum_duration_is_unsupported_without_partial_role_matching() -> None:
+def test_complete_calendar_months_counts_full_years() -> None:
+    assert complete_calendar_months(date(2020, 1, 1), date(2023, 1, 1)) == 36
+
+
+def test_complete_calendar_months_excludes_partial_month() -> None:
+    assert complete_calendar_months(date(2020, 1, 15), date(2023, 1, 14)) == 35
+
+
+def test_complete_calendar_months_returns_zero_for_same_date() -> None:
+    same_date = date(2020, 1, 1)
+
+    assert complete_calendar_months(same_date, same_date) == 0
+
+
+def test_years_duration_matches_exact_calendar_months() -> None:
     requirement = ExperienceRequirement(
         role="Backend Developer",
         minimum_duration=ExperienceMinimumDuration(3, ExperienceDurationUnit.YEARS),
@@ -93,7 +108,124 @@ def test_minimum_duration_is_unsupported_without_partial_role_matching() -> None
         _candidate(_experience()), _criterion(requirement)
     )
 
+    assert result.status is MatchStatus.MATCHED
+
+
+def test_years_duration_does_not_match_partial_year() -> None:
+    requirement = ExperienceRequirement(
+        role="Backend Developer",
+        minimum_duration=ExperienceMinimumDuration(3, ExperienceDurationUnit.YEARS),
+        minimum_duration_evidence="3 years",
+    )
+    experience = _experience(end_date=date(2022, 12, 31))
+
+    result = ExperienceCandidateCriterionMatcher().match(
+        _candidate(experience), _criterion(requirement)
+    )
+
+    assert result.status is MatchStatus.NOT_MATCHED
+
+
+def test_months_duration_matches_exact_months() -> None:
+    requirement = ExperienceRequirement(
+        role="Backend Developer",
+        minimum_duration=ExperienceMinimumDuration(3, ExperienceDurationUnit.MONTHS),
+        minimum_duration_evidence="3 months",
+    )
+
+    result = ExperienceCandidateCriterionMatcher().match(
+        _candidate(_experience(end_date=date(2020, 4, 1))), _criterion(requirement)
+    )
+
+    assert result.status is MatchStatus.MATCHED
+
+
+def test_partial_month_does_not_count_for_duration() -> None:
+    requirement = ExperienceRequirement(
+        role="Backend Developer",
+        minimum_duration=ExperienceMinimumDuration(3, ExperienceDurationUnit.MONTHS),
+        minimum_duration_evidence="3 months",
+    )
+
+    result = ExperienceCandidateCriterionMatcher().match(
+        _candidate(_experience(end_date=date(2020, 3, 31))), _criterion(requirement)
+    )
+
+    assert result.status is MatchStatus.NOT_MATCHED
+
+
+def test_relevant_open_experience_is_unsupported_for_duration() -> None:
+    requirement = ExperienceRequirement(
+        role="Backend Developer",
+        minimum_duration=ExperienceMinimumDuration(3, ExperienceDurationUnit.YEARS),
+        minimum_duration_evidence="3 years",
+    )
+
+    result = ExperienceCandidateCriterionMatcher().match(
+        _candidate(_experience(end_date=None)), _criterion(requirement)
+    )
+
     assert result.status is MatchStatus.UNSUPPORTED
+
+
+def test_no_relevant_experience_is_not_matched_for_duration() -> None:
+    requirement = ExperienceRequirement(
+        role="Backend Developer",
+        minimum_duration=ExperienceMinimumDuration(3, ExperienceDurationUnit.YEARS),
+        minimum_duration_evidence="3 years",
+    )
+
+    result = ExperienceCandidateCriterionMatcher().match(
+        _candidate(_experience(role="Support Analyst")), _criterion(requirement)
+    )
+
+    assert result.status is MatchStatus.NOT_MATCHED
+
+
+def test_multiple_relevant_experiences_are_unsupported_for_duration() -> None:
+    requirement = ExperienceRequirement(
+        role="Backend Developer",
+        minimum_duration=ExperienceMinimumDuration(3, ExperienceDurationUnit.YEARS),
+        minimum_duration_evidence="3 years",
+    )
+
+    result = ExperienceCandidateCriterionMatcher().match(
+        _candidate(_experience(), _experience()), _criterion(requirement)
+    )
+
+    assert result.status is MatchStatus.UNSUPPORTED
+
+
+def test_role_and_duration_must_match_same_experience() -> None:
+    requirement = ExperienceRequirement(
+        role="Backend Developer",
+        minimum_duration=ExperienceMinimumDuration(3, ExperienceDurationUnit.YEARS),
+        minimum_duration_evidence="3 years",
+    )
+    candidate = _candidate(
+        _experience(end_date=date(2022, 1, 1)),
+        _experience(role="Support Analyst", end_date=date(2024, 1, 1)),
+    )
+
+    result = ExperienceCandidateCriterionMatcher().match(candidate, _criterion(requirement))
+
+    assert result.status is MatchStatus.NOT_MATCHED
+
+
+def test_company_and_duration_use_same_experience() -> None:
+    requirement = ExperienceRequirement(
+        company="Example Corp",
+        minimum_duration=ExperienceMinimumDuration(3, ExperienceDurationUnit.YEARS),
+        minimum_duration_evidence="3 years",
+    )
+    candidate = _candidate(
+        _experience(company="Example Corp", end_date=date(2022, 1, 1)),
+        _experience(company="Other Corp", end_date=date(2024, 1, 1)),
+    )
+
+    result = ExperienceCandidateCriterionMatcher().match(candidate, _criterion(requirement))
+
+    assert result.status is MatchStatus.NOT_MATCHED
 
 
 def test_role_matches_with_strip_casefold() -> None:
@@ -218,7 +350,7 @@ def test_exact_matcher_delegates_evaluable_experience() -> None:
     assert result.status is MatchStatus.MATCHED
 
 
-def test_exact_matcher_keeps_duration_unsupported() -> None:
+def test_exact_matcher_delegates_supported_duration() -> None:
     criterion = _criterion(
         ExperienceRequirement(
             role="Backend Developer",
@@ -231,4 +363,4 @@ def test_exact_matcher_keeps_duration_unsupported() -> None:
 
     result = ExactCandidateCriterionMatcher().match(_candidate(_experience()), criterion)
 
-    assert result.status is MatchStatus.UNSUPPORTED
+    assert result.status is MatchStatus.MATCHED
