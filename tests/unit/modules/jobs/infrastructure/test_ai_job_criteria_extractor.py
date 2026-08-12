@@ -9,6 +9,7 @@ from resume_ai.modules.jobs.domain.entities import (
     CriterionCategory,
     EducationRequirementStatus,
     EducationRequirementStatusEvidence,
+    ExperienceDurationUnit,
     JobCriteria,
     JobPosting,
 )
@@ -141,6 +142,39 @@ def test_ai_extractor_converts_in_progress_status_provenance_to_domain() -> None
     assert isinstance(status_evidence[0], EducationRequirementStatusEvidence)
     assert status_evidence[0].status is EducationRequirementStatus.IN_PROGRESS
     assert status_evidence[0].evidence == "currently pursuing"
+
+
+def test_ai_extractor_converts_structured_experience_response_to_domain() -> None:
+    response = JobCriteriaInput(
+        criteria=[
+            {
+                "category": "experience",
+                "value": "Backend Developer experience",
+                "evidence": "3 years of experience as Backend Developer",
+                "experience_requirement": {
+                    "role": "Backend Developer",
+                    "minimum_duration": {"value": 3, "unit": "years"},
+                    "minimum_duration_evidence": "3 years",
+                },
+            }
+        ]
+    )
+
+    result = AIJobCriteriaExtractor(FakeStructuredAIClient(response)).extract(
+        JobPosting(description=response.criteria[0].evidence)
+    )
+
+    criterion = result.criteria[0]
+    requirement = criterion.experience_requirement
+    assert criterion.category is CriterionCategory.EXPERIENCE
+    assert requirement is not None
+    assert requirement.role == "Backend Developer"
+    assert requirement.company is None
+    assert requirement.minimum_duration is not None
+    assert requirement.minimum_duration.value == 3
+    assert requirement.minimum_duration.unit is ExperienceDurationUnit.YEARS
+    assert requirement.minimum_duration_evidence == "3 years"
+    assert criterion.evidence == "3 years of experience as Backend Developer"
 
 
 def test_ai_extractor_preserves_independent_provenance_for_both_statuses() -> None:
