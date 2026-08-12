@@ -6,6 +6,7 @@ from resume_ai.core.exceptions import DomainError
 from resume_ai.modules.jobs.domain.entities import (
     CriterionCategory,
     CriterionImportance,
+    EducationRequirement,
     JobCriteria,
     JobCriterion,
     JobPosting,
@@ -98,6 +99,38 @@ def test_truth_gate_does_not_validate_value_semantics() -> None:
     criteria = JobCriteria(criteria=(_criterion("Postgres", evidence),))
 
     JobCriteriaTruthGate().validate(job, criteria)
+
+
+def test_truth_gate_rejects_grounding_failure_after_global_evidence_passes() -> None:
+    evidence = "Bachelor's degree required."
+    criterion = JobCriterion(
+        category=CriterionCategory.EDUCATION,
+        value="Computer Science degree",
+        evidence=evidence,
+        education_requirement=EducationRequirement(
+            degree_level="Bachelor's", field_of_study="Computer Science"
+        ),
+    )
+
+    with pytest.raises(DomainError, match="field_of_study is not present"):
+        JobCriteriaTruthGate().validate(
+            JobPosting(description=evidence), JobCriteria(criteria=(criterion,))
+        )
+
+
+def test_truth_gate_runs_global_evidence_before_education_grounding() -> None:
+    criterion = JobCriterion(
+        category=CriterionCategory.EDUCATION,
+        value="Computer Science degree",
+        evidence="Invented evidence",
+        education_requirement=EducationRequirement(field_of_study="Computer Science"),
+    )
+
+    with pytest.raises(DomainError, match="evidence is not present"):
+        JobCriteriaTruthGate().validate(
+            JobPosting(description="Bachelor's degree required."),
+            JobCriteria(criteria=(criterion,)),
+        )
 
 
 def test_truth_gate_validate_type_hints() -> None:

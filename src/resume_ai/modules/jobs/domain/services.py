@@ -1,5 +1,44 @@
 from resume_ai.core.exceptions import DomainError
-from resume_ai.modules.jobs.domain.entities import JobCriteria, JobPosting
+from resume_ai.modules.jobs.domain.entities import JobCriteria, JobCriterion, JobPosting
+
+
+class EducationRequirementTruthGate:
+    def validate(self, criterion: JobCriterion) -> None:
+        requirement = criterion.education_requirement
+        if requirement is None:
+            return None
+
+        if (
+            requirement.degree_level is not None
+            and requirement.degree_level not in criterion.evidence
+        ):
+            raise DomainError(
+                "education degree_level is not present in criterion evidence"
+            )
+        if (
+            requirement.field_of_study is not None
+            and requirement.field_of_study not in criterion.evidence
+        ):
+            raise DomainError(
+                "education field_of_study is not present in criterion evidence"
+            )
+        if (
+            requirement.institution is not None
+            and requirement.institution not in criterion.evidence
+        ):
+            raise DomainError(
+                "education institution is not present in criterion evidence"
+            )
+
+        for item in requirement.status_evidence:
+            if item.evidence not in criterion.evidence:
+                raise DomainError(
+                    "education status evidence is not present in criterion evidence"
+                )
+
+        grounded_statuses = {item.status for item in requirement.status_evidence}
+        if any(status not in grounded_statuses for status in requirement.acceptable_statuses):
+            raise DomainError("education acceptable status requires status evidence")
 
 
 class JobCriteriaTruthGate:
@@ -9,3 +48,4 @@ class JobCriteriaTruthGate:
                 raise DomainError(
                     "Job criterion evidence is not present in the job description"
                 )
+            EducationRequirementTruthGate().validate(criterion)
