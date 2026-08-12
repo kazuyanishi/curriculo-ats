@@ -140,17 +140,29 @@ class ExperienceRequirement:
     role: str | None = None
     company: str | None = None
     minimum_duration: ExperienceMinimumDuration | None = None
+    minimum_duration_evidence: str | None = None
 
     def __post_init__(self) -> None:
         _require_optional_non_blank_string("experience role", self.role)
         _require_optional_non_blank_string("experience company", self.company)
+        _require_optional_non_blank_string(
+            "experience minimum_duration_evidence", self.minimum_duration_evidence
+        )
         if self.minimum_duration is not None and not isinstance(
             self.minimum_duration, ExperienceMinimumDuration
         ):
             raise DomainError(
                 "experience minimum_duration must be an ExperienceMinimumDuration"
             )
-        if self.role is None and self.company is None and self.minimum_duration is None:
+        if self.minimum_duration_evidence is not None and self.minimum_duration is None:
+            raise DomainError(
+                "experience minimum_duration_evidence requires minimum_duration"
+            )
+        if (
+            self.role is None
+            and self.company is None
+            and self.minimum_duration is None
+        ):
             raise DomainError(
                 "experience requirement must define at least one requirement"
             )
