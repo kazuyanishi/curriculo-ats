@@ -1,6 +1,6 @@
+import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-import os
 
 
 @dataclass(frozen=True, slots=True)
