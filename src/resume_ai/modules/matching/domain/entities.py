@@ -62,3 +62,21 @@ class MatchingResult:
     @property
     def unsupported_count(self) -> int:
         return len(self.unsupported)
+
+
+@dataclass(frozen=True, slots=True)
+class MatchingScore:
+    score: float | None
+    coverage: float | None
+
+    def __post_init__(self) -> None:
+        for field_name, value in (
+            ("score", self.score),
+            ("coverage", self.coverage),
+        ):
+            if value is None:
+                continue
+            if type(value) is not float:
+                raise DomainError(f"{field_name} must be a float or None")
+            if not 0.0 <= value <= 1.0:
+                raise DomainError(f"{field_name} must be between 0.0 and 1.0")
