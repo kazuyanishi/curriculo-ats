@@ -4,6 +4,7 @@ from resume_ai.modules.candidate.domain.entities import Candidate
 from resume_ai.modules.jobs.domain.entities import CriterionCategory, JobCriterion
 from resume_ai.modules.matching.domain.entities import (
     CriterionMatch,
+    GapAnalysisResult,
     MatchingResult,
     MatchingScore,
     MatchStatus,
@@ -174,3 +175,14 @@ class MatchingScoreCalculator:
             else evaluated_count / result.total
         )
         return MatchingScore(score=score, coverage=coverage)
+
+
+class DeterministicGapAnalyzer:
+    def analyze(self, result: MatchingResult) -> GapAnalysisResult:
+        gaps = tuple(
+            match for match in result.matches if match.status is MatchStatus.NOT_MATCHED
+        )
+        unsupported = tuple(
+            match for match in result.matches if match.status is MatchStatus.UNSUPPORTED
+        )
+        return GapAnalysisResult(gaps=gaps, unsupported=unsupported)

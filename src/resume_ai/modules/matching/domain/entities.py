@@ -65,6 +65,22 @@ class MatchingResult:
 
 
 @dataclass(frozen=True, slots=True)
+class GapAnalysisResult:
+    gaps: tuple[CriterionMatch, ...] = ()
+    unsupported: tuple[CriterionMatch, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.gaps, tuple):
+            raise DomainError("gaps must be a tuple of CriterionMatch")
+        if not isinstance(self.unsupported, tuple):
+            raise DomainError("unsupported must be a tuple of CriterionMatch")
+        if not all(isinstance(match, CriterionMatch) for match in self.gaps):
+            raise DomainError("gaps must contain only CriterionMatch")
+        if not all(isinstance(match, CriterionMatch) for match in self.unsupported):
+            raise DomainError("unsupported must contain only CriterionMatch")
+
+
+@dataclass(frozen=True, slots=True)
 class MatchingScore:
     score: float | None
     coverage: float | None

@@ -11,11 +11,13 @@ from resume_ai.modules.jobs.infrastructure.ai_extractor import AIJobCriteriaExtr
 from resume_ai.modules.jobs.infrastructure.text_repository import TextJobRepository
 from resume_ai.modules.matching.application.matchers import DeterministicCandidateJobMatcher
 from resume_ai.modules.matching.application.services import (
+    AnalyzeMatchingGaps,
     CalculateMatchingScore,
     MatchAndScoreCandidateToJob,
     MatchCandidateToJob,
 )
 from resume_ai.modules.matching.domain.services import (
+    DeterministicGapAnalyzer,
     ExactCandidateCriterionMatcher,
     MatchingScoreCalculator,
 )
@@ -49,6 +51,11 @@ def build_match_candidate_to_job() -> MatchCandidateToJob:
 def build_calculate_matching_score() -> CalculateMatchingScore:
     calculator = MatchingScoreCalculator()
     return CalculateMatchingScore(calculator)
+
+
+def build_analyze_matching_gaps() -> AnalyzeMatchingGaps:
+    analyzer = DeterministicGapAnalyzer()
+    return AnalyzeMatchingGaps(analyzer)
 
 
 def build_match_and_score_candidate_to_job() -> MatchAndScoreCandidateToJob:

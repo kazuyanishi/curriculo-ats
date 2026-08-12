@@ -1,8 +1,15 @@
 from resume_ai.modules.candidate.domain.entities import Candidate
 from resume_ai.modules.jobs.domain.entities import JobCriteria
 from resume_ai.modules.matching.application.ports import CandidateJobMatcher
-from resume_ai.modules.matching.domain.entities import MatchingResult, MatchingScore
-from resume_ai.modules.matching.domain.services import MatchingScoreCalculator
+from resume_ai.modules.matching.domain.entities import (
+    GapAnalysisResult,
+    MatchingResult,
+    MatchingScore,
+)
+from resume_ai.modules.matching.domain.services import (
+    DeterministicGapAnalyzer,
+    MatchingScoreCalculator,
+)
 
 
 class MatchCandidateToJob:
@@ -23,6 +30,14 @@ class CalculateMatchingScore:
 
     def execute(self, result: MatchingResult) -> MatchingScore:
         return self._calculator.calculate(result)
+
+
+class AnalyzeMatchingGaps:
+    def __init__(self, analyzer: DeterministicGapAnalyzer) -> None:
+        self._analyzer = analyzer
+
+    def execute(self, result: MatchingResult) -> GapAnalysisResult:
+        return self._analyzer.analyze(result)
 
 
 class MatchAndScoreCandidateToJob:
