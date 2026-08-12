@@ -11,6 +11,8 @@ requires-python = ">=3.13"
 dependencies = [
     "openai",
     "pydantic>=2.13,<3",
+    "python-docx",
+    "reportlab",
 ]
 
 [project.optional-dependencies]

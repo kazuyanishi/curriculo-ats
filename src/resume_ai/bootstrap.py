@@ -5,6 +5,9 @@ from resume_ai.modules.candidate.application.services import LoadCandidate
 from resume_ai.modules.candidate.infrastructure.json_repository import (
     JsonCandidateRepository,
 )
+from resume_ai.modules.documents.application.services import GenerateCandidateDocuments
+from resume_ai.modules.documents.infrastructure.docx_renderer import DocxCandidateRenderer
+from resume_ai.modules.documents.infrastructure.pdf_renderer import PdfCandidateRenderer
 from resume_ai.modules.jobs.application.services import ExtractJobCriteria, LoadJob
 from resume_ai.modules.jobs.domain.services import JobCriteriaTruthGate
 from resume_ai.modules.jobs.infrastructure.ai_extractor import AIJobCriteriaExtractor
@@ -73,6 +76,13 @@ def build_analyze_candidate_for_job(config: AIConfig) -> AnalyzeCandidateForJob:
         matcher=build_match_and_score_candidate_to_job(),
         gap_analyzer=build_analyze_matching_gaps(),
         optimizer=build_optimize_candidate(),
+    )
+
+
+def build_generate_candidate_documents() -> GenerateCandidateDocuments:
+    return GenerateCandidateDocuments(
+        docx_renderer=DocxCandidateRenderer(),
+        pdf_renderer=PdfCandidateRenderer(),
     )
 
 
