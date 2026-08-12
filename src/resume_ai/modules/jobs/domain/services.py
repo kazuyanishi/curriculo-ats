@@ -41,6 +41,34 @@ class EducationRequirementTruthGate:
             raise DomainError("education acceptable status requires status evidence")
 
 
+class ExperienceRequirementTruthGate:
+    def validate(self, criterion: JobCriterion) -> None:
+        requirement = criterion.experience_requirement
+        if requirement is None:
+            return None
+
+        if requirement.role is not None and requirement.role not in criterion.evidence:
+            raise DomainError(
+                "experience role is not present in criterion evidence"
+            )
+        if (
+            requirement.company is not None
+            and requirement.company not in criterion.evidence
+        ):
+            raise DomainError(
+                "experience company is not present in criterion evidence"
+            )
+        if requirement.minimum_duration is not None:
+            if requirement.minimum_duration_evidence is None:
+                raise DomainError(
+                    "experience minimum duration requires duration evidence"
+                )
+            if requirement.minimum_duration_evidence not in criterion.evidence:
+                raise DomainError(
+                    "experience duration evidence is not present in criterion evidence"
+                )
+
+
 class JobCriteriaTruthGate:
     def validate(self, job: JobPosting, criteria: JobCriteria) -> None:
         for criterion in criteria.criteria:
@@ -49,3 +77,4 @@ class JobCriteriaTruthGate:
                     "Job criterion evidence is not present in the job description"
                 )
             EducationRequirementTruthGate().validate(criterion)
+            ExperienceRequirementTruthGate().validate(criterion)
