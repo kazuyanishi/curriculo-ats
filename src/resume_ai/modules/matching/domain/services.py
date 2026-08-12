@@ -20,6 +20,8 @@ class ExactCandidateCriterionMatcher:
     ) -> CriterionMatch:
         if criterion.category is CriterionCategory.EDUCATION:
             return EducationCandidateCriterionMatcher().match(candidate, criterion)
+        if criterion.category is CriterionCategory.EXPERIENCE:
+            return ExperienceCandidateCriterionMatcher().match(candidate, criterion)
         if criterion.category is CriterionCategory.SKILL:
             items = candidate.skills
         elif criterion.category is CriterionCategory.TECHNOLOGY:
@@ -43,6 +45,37 @@ class ExactCandidateCriterionMatcher:
             else MatchStatus.NOT_MATCHED
         )
         return CriterionMatch(criterion=criterion, status=status)
+
+
+class ExperienceCandidateCriterionMatcher:
+    def match(
+        self,
+        candidate: Candidate,
+        criterion: JobCriterion,
+    ) -> CriterionMatch:
+        requirement = criterion.experience_requirement
+        if (
+            criterion.category is not CriterionCategory.EXPERIENCE
+            or requirement is None
+            or requirement.minimum_duration is not None
+        ):
+            return CriterionMatch(criterion=criterion, status=MatchStatus.UNSUPPORTED)
+
+        for experience in candidate.experiences:
+            role_matches = (
+                requirement.role is None
+                or _normalize_name(experience.role)
+                == _normalize_name(requirement.role)
+            )
+            company_matches = (
+                requirement.company is None
+                or _normalize_name(experience.company)
+                == _normalize_name(requirement.company)
+            )
+            if role_matches and company_matches:
+                return CriterionMatch(criterion=criterion, status=MatchStatus.MATCHED)
+
+        return CriterionMatch(criterion=criterion, status=MatchStatus.NOT_MATCHED)
 
 
 class EducationCandidateCriterionMatcher:
