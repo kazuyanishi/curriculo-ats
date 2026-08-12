@@ -1,4 +1,5 @@
 import inspect
+from datetime import date
 from typing import get_type_hints
 
 from resume_ai.bootstrap import (
@@ -9,6 +10,7 @@ from resume_ai.bootstrap import (
 from resume_ai.modules.candidate.domain.entities import (
     Candidate,
     ContactInfo,
+    Experience,
     Language,
     PersonalInfo,
     Skill,
@@ -18,6 +20,9 @@ from resume_ai.modules.candidate.domain.entities import (
 from resume_ai.modules.jobs.domain.entities import (
     CriterionCategory,
     CriterionImportance,
+    ExperienceDurationUnit,
+    ExperienceMinimumDuration,
+    ExperienceRequirement,
     JobCriteria,
     JobCriterion,
 )
@@ -33,7 +38,7 @@ from resume_ai.modules.matching.domain.entities import (
 )
 
 
-def _candidate() -> Candidate:
+def _candidate(*experiences: Experience) -> Candidate:
     return Candidate(
         personal_info=PersonalInfo(
             full_name="Jane Doe",
@@ -46,6 +51,7 @@ def _candidate() -> Candidate:
         technologies=(Technology("Python"),),
         tools=(Tool("Docker"),),
         languages=(Language("English"),),
+        experiences=experiences,
     )
 
 
@@ -193,6 +199,136 @@ def test_match_and_score_builder_runs_real_pipeline() -> None:
     assert matching_result.matched_count == 1
     assert matching_score.score == 1.0
     assert matching_score.coverage == 1.0
+
+
+def test_match_and_score_builder_matches_closed_experience_duration() -> None:
+    criterion = JobCriterion(
+        category=CriterionCategory.EXPERIENCE,
+        value="Backend Developer experience",
+        evidence="3 years of experience as Backend Developer",
+        experience_requirement=ExperienceRequirement(
+            role="Backend Developer",
+            minimum_duration=ExperienceMinimumDuration(
+                3, ExperienceDurationUnit.YEARS
+            ),
+            minimum_duration_evidence="3 years",
+        ),
+    )
+    candidate = _candidate(
+        Experience(
+            company="Example Corp",
+            role="Backend Developer",
+            start_date=date(2020, 1, 1),
+            end_date=date(2023, 1, 1),
+        )
+    )
+
+    matching_result, matching_score = build_match_and_score_candidate_to_job().execute(
+        candidate, JobCriteria(criteria=(criterion,))
+    )
+
+    assert matching_result.matches[0].status is MatchStatus.MATCHED
+    assert matching_result.matched_count == 1
+    assert matching_result.not_matched_count == 0
+    assert matching_result.unsupported_count == 0
+    assert matching_score.score == 1.0
+    assert matching_score.coverage == 1.0
+
+
+def test_match_and_score_builder_keeps_open_experience_unsupported() -> None:
+    criterion = JobCriterion(
+        category=CriterionCategory.EXPERIENCE,
+        value="Backend Developer experience",
+        evidence="3 years of experience as Backend Developer",
+        experience_requirement=ExperienceRequirement(
+            role="Backend Developer",
+            minimum_duration=ExperienceMinimumDuration(
+                3, ExperienceDurationUnit.YEARS
+            ),
+            minimum_duration_evidence="3 years",
+        ),
+    )
+    candidate = _candidate(
+        Experience(
+            company="Example Corp",
+            role="Backend Developer",
+            start_date=date(2020, 1, 1),
+        )
+    )
+
+    matching_result, matching_score = build_match_and_score_candidate_to_job().execute(
+        candidate, JobCriteria(criteria=(criterion,))
+    )
+
+    assert matching_result.matches[0].status is MatchStatus.UNSUPPORTED
+    assert matching_result.matched_count == 0
+    assert matching_result.not_matched_count == 0
+    assert matching_result.unsupported_count == 1
+    assert matching_score.score is None
+    assert matching_score.coverage == 0.0
+
+
+def test_match_and_score_builder_preserves_mixed_experience_pipeline_order() -> None:
+    supported = JobCriterion(
+        category=CriterionCategory.EXPERIENCE,
+        value="Backend Developer experience",
+        evidence="3 years of experience as Backend Developer",
+        experience_requirement=ExperienceRequirement(
+            role="Backend Developer",
+            minimum_duration=ExperienceMinimumDuration(
+                3, ExperienceDurationUnit.YEARS
+            ),
+            minimum_duration_evidence="3 years",
+        ),
+    )
+    missing_technology = _criterion(CriterionCategory.TECHNOLOGY, "Kubernetes")
+    unsupported = JobCriterion(
+        category=CriterionCategory.EXPERIENCE,
+        value="Support Analyst experience",
+        evidence="3 years of experience as Support Analyst",
+        experience_requirement=ExperienceRequirement(
+            role="Support Analyst",
+            minimum_duration=ExperienceMinimumDuration(
+                3, ExperienceDurationUnit.YEARS
+            ),
+            minimum_duration_evidence="3 years",
+        ),
+    )
+    candidate = _candidate(
+        Experience(
+            company="Example Corp",
+            role="Backend Developer",
+            start_date=date(2020, 1, 1),
+            end_date=date(2023, 1, 1),
+        ),
+        Experience(
+            company="Example Corp",
+            role="Support Analyst",
+            start_date=date(2020, 1, 1),
+        ),
+    )
+    criteria = JobCriteria(criteria=(supported, missing_technology, unsupported))
+
+    matching_result, matching_score = build_match_and_score_candidate_to_job().execute(
+        candidate, criteria
+    )
+
+    assert [match.criterion for match in matching_result.matches] == [
+        supported,
+        missing_technology,
+        unsupported,
+    ]
+    assert [match.status for match in matching_result.matches] == [
+        MatchStatus.MATCHED,
+        MatchStatus.NOT_MATCHED,
+        MatchStatus.UNSUPPORTED,
+    ]
+    assert matching_result.total == 3
+    assert matching_result.matched_count == 1
+    assert matching_result.not_matched_count == 1
+    assert matching_result.unsupported_count == 1
+    assert matching_score.score == 0.5
+    assert matching_score.coverage == 2 / 3
 
 
 def test_match_and_score_builder_returns_independent_service_instances() -> None:
