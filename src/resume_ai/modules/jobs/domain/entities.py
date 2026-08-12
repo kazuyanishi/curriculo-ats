@@ -54,6 +54,11 @@ class EducationRequirementStatus(StrEnum):
     IN_PROGRESS = "in_progress"
 
 
+class ExperienceDurationUnit(StrEnum):
+    MONTHS = "months"
+    YEARS = "years"
+
+
 def _require_enum(field_name: str, value: object, expected_type: type) -> None:
     if not isinstance(value, expected_type):
         raise DomainError(f"{field_name} must be a {expected_type.__name__}")
@@ -118,12 +123,47 @@ class EducationRequirement:
 
 
 @dataclass(frozen=True, slots=True)
+class ExperienceMinimumDuration:
+    value: int
+    unit: ExperienceDurationUnit
+
+    def __post_init__(self) -> None:
+        if type(self.value) is not int:
+            raise DomainError("experience duration value must be an int")
+        if self.value <= 0:
+            raise DomainError("experience duration value must be greater than zero")
+        _require_enum("experience duration unit", self.unit, ExperienceDurationUnit)
+
+
+@dataclass(frozen=True, slots=True)
+class ExperienceRequirement:
+    role: str | None = None
+    company: str | None = None
+    minimum_duration: ExperienceMinimumDuration | None = None
+
+    def __post_init__(self) -> None:
+        _require_optional_non_blank_string("experience role", self.role)
+        _require_optional_non_blank_string("experience company", self.company)
+        if self.minimum_duration is not None and not isinstance(
+            self.minimum_duration, ExperienceMinimumDuration
+        ):
+            raise DomainError(
+                "experience minimum_duration must be an ExperienceMinimumDuration"
+            )
+        if self.role is None and self.company is None and self.minimum_duration is None:
+            raise DomainError(
+                "experience requirement must define at least one requirement"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class JobCriterion:
     category: CriterionCategory
     value: str
     evidence: str
     importance: CriterionImportance = CriterionImportance.UNSPECIFIED
     education_requirement: EducationRequirement | None = None
+    experience_requirement: ExperienceRequirement | None = None
 
     def __post_init__(self) -> None:
         _require_enum("category", self.category, CriterionCategory)
@@ -136,6 +176,15 @@ class JobCriterion:
             if self.category is not CriterionCategory.EDUCATION:
                 raise DomainError(
                     "education_requirement requires education criterion category"
+                )
+        if self.experience_requirement is not None:
+            if not isinstance(self.experience_requirement, ExperienceRequirement):
+                raise DomainError(
+                    "experience_requirement must be an ExperienceRequirement"
+                )
+            if self.category is not CriterionCategory.EXPERIENCE:
+                raise DomainError(
+                    "experience_requirement requires experience criterion category"
                 )
 
 
