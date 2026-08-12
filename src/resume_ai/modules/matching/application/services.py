@@ -23,3 +23,22 @@ class CalculateMatchingScore:
 
     def execute(self, result: MatchingResult) -> MatchingScore:
         return self._calculator.calculate(result)
+
+
+class MatchAndScoreCandidateToJob:
+    def __init__(
+        self,
+        matcher: MatchCandidateToJob,
+        score_calculator: CalculateMatchingScore,
+    ) -> None:
+        self._matcher = matcher
+        self._score_calculator = score_calculator
+
+    def execute(
+        self,
+        candidate: Candidate,
+        criteria: JobCriteria,
+    ) -> tuple[MatchingResult, MatchingScore]:
+        matching_result = self._matcher.execute(candidate, criteria)
+        matching_score = self._score_calculator.execute(matching_result)
+        return matching_result, matching_score
