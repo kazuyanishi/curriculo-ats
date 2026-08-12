@@ -25,6 +25,14 @@ export type Candidate = {
   tools: NamedItem[]; languages: Language[]; certifications: Certification[]; projects: Project[];
 };
 export type Job = { title: string; company: string; location: string; source_url: string; description: string };
+export type MatchStatus = "matched" | "not_matched" | "unsupported";
+export type CriterionCategory = "skill" | "technology" | "tool" | "language" | "education" | "experience" | "certification" | "other";
+export type CriterionImportance = "required" | "preferred" | "unspecified";
+export type JobCriterionResponse = { category: CriterionCategory; value: string; evidence: string; importance: CriterionImportance };
+export type CriterionMatchResponse = { criterion: JobCriterionResponse; status: MatchStatus };
+export type MatchingScoreResponse = { score: number | null; coverage: number | null };
+export type GapAnalysisResponse = { gaps: CriterionMatchResponse[]; unsupported: CriterionMatchResponse[] };
+export type AnalyzeResponse = { criteria: JobCriterionResponse[]; matching: CriterionMatchResponse[]; score: MatchingScoreResponse; gaps: GapAnalysisResponse; optimized_candidate: Candidate };
 
 export type NormalizedCandidate = Omit<Candidate, "personal_info" | "contact_info" | "professional_links" | "experiences" | "education" | "skills" | "technologies" | "tools" | "languages" | "certifications" | "projects"> & {
   personal_info: PersonalInfo;
