@@ -1,7 +1,10 @@
 import inspect
 from typing import get_type_hints
 
-from resume_ai.bootstrap import build_match_candidate_to_job
+from resume_ai.bootstrap import (
+    build_calculate_matching_score,
+    build_match_candidate_to_job,
+)
 from resume_ai.modules.candidate.domain.entities import (
     Candidate,
     ContactInfo,
@@ -17,8 +20,15 @@ from resume_ai.modules.jobs.domain.entities import (
     JobCriteria,
     JobCriterion,
 )
-from resume_ai.modules.matching.application.services import MatchCandidateToJob
-from resume_ai.modules.matching.domain.entities import MatchStatus
+from resume_ai.modules.matching.application.services import (
+    CalculateMatchingScore,
+    MatchCandidateToJob,
+)
+from resume_ai.modules.matching.domain.entities import (
+    MatchingResult,
+    MatchingScore,
+    MatchStatus,
+)
 
 
 def _candidate() -> Candidate:
@@ -124,4 +134,31 @@ def test_builder_signature_and_type_hints() -> None:
     signature = inspect.signature(build_match_candidate_to_job)
 
     assert hints["return"] is MatchCandidateToJob
+    assert signature.parameters == {}
+
+
+def test_score_builder_returns_calculate_matching_score() -> None:
+    service = build_calculate_matching_score()
+
+    assert isinstance(service, CalculateMatchingScore)
+
+
+def test_score_builder_processes_empty_matching_result() -> None:
+    result = build_calculate_matching_score().execute(MatchingResult())
+
+    assert result == MatchingScore(score=None, coverage=None)
+
+
+def test_score_builder_returns_independent_service_instances() -> None:
+    first = build_calculate_matching_score()
+    second = build_calculate_matching_score()
+
+    assert first is not second
+
+
+def test_score_builder_signature_and_type_hints() -> None:
+    hints = get_type_hints(build_calculate_matching_score)
+    signature = inspect.signature(build_calculate_matching_score)
+
+    assert hints["return"] is CalculateMatchingScore
     assert signature.parameters == {}
