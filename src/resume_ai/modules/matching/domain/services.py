@@ -1,3 +1,5 @@
+from datetime import date
+
 from resume_ai.modules.candidate.domain.entities import Candidate
 from resume_ai.modules.jobs.domain.entities import CriterionCategory, JobCriterion
 from resume_ai.modules.matching.domain.entities import (
@@ -10,6 +12,16 @@ from resume_ai.modules.matching.domain.entities import (
 
 def _normalize_name(value: str) -> str:
     return value.strip().casefold()
+
+
+def complete_calendar_months(start_date: date, end_date: date) -> int:
+    months = (end_date.year - start_date.year) * 12
+    months += end_date.month - start_date.month
+
+    if end_date.day < start_date.day:
+        months -= 1
+
+    return months
 
 
 class ExactCandidateCriterionMatcher:
@@ -57,10 +69,10 @@ class ExperienceCandidateCriterionMatcher:
         if (
             criterion.category is not CriterionCategory.EXPERIENCE
             or requirement is None
-            or requirement.minimum_duration is not None
         ):
             return CriterionMatch(criterion=criterion, status=MatchStatus.UNSUPPORTED)
 
+        relevant_experiences = []
         for experience in candidate.experiences:
             role_matches = (
                 requirement.role is None
@@ -73,9 +85,42 @@ class ExperienceCandidateCriterionMatcher:
                 == _normalize_name(requirement.company)
             )
             if role_matches and company_matches:
-                return CriterionMatch(criterion=criterion, status=MatchStatus.MATCHED)
+                relevant_experiences.append(experience)
 
-        return CriterionMatch(criterion=criterion, status=MatchStatus.NOT_MATCHED)
+        if requirement.minimum_duration is None:
+            status = (
+                MatchStatus.MATCHED
+                if relevant_experiences
+                else MatchStatus.NOT_MATCHED
+            )
+            return CriterionMatch(criterion=criterion, status=status)
+
+        if not relevant_experiences or len(relevant_experiences) > 1:
+            status = (
+                MatchStatus.NOT_MATCHED
+                if not relevant_experiences
+                else MatchStatus.UNSUPPORTED
+            )
+            return CriterionMatch(criterion=criterion, status=status)
+
+        experience = relevant_experiences[0]
+        if experience.end_date is None:
+            return CriterionMatch(criterion=criterion, status=MatchStatus.UNSUPPORTED)
+
+        required_months = (
+            requirement.minimum_duration.value
+            if requirement.minimum_duration.unit.value == "months"
+            else requirement.minimum_duration.value * 12
+        )
+        actual_months = complete_calendar_months(
+            experience.start_date, experience.end_date
+        )
+        status = (
+            MatchStatus.MATCHED
+            if actual_months >= required_months
+            else MatchStatus.NOT_MATCHED
+        )
+        return CriterionMatch(criterion=criterion, status=status)
 
 
 class EducationCandidateCriterionMatcher:
