@@ -69,6 +69,34 @@ def test_analyze_uses_pipeline_and_returns_structured_response(monkeypatch) -> N
     assert body["optimized_candidate"]["personal_info"]["full_name"] == "Jane Doe"
 
 
+def test_analyze_optimized_candidate_round_trips_to_documents(monkeypatch) -> None:
+    monkeypatch.setattr("resume_ai.bootstrap.OpenAIStructuredAIClient", FakeOpenAIClient)
+    client = TestClient(create_app(AIConfig("key", "model")))
+
+    analysis_response = client.post(
+        "/api/v1/analyze",
+        json={
+            "candidate": _candidate_payload(),
+            "job": {"description": "Python is required."},
+        },
+    )
+
+    assert analysis_response.status_code == 200
+    optimized_candidate = analysis_response.json()["optimized_candidate"]
+
+    docx_response = client.post("/api/v1/documents/docx", json=optimized_candidate)
+    pdf_response = client.post("/api/v1/documents/pdf", json=optimized_candidate)
+
+    assert docx_response.status_code == 200
+    assert docx_response.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+    assert Document(BytesIO(docx_response.content)).paragraphs
+    assert pdf_response.status_code == 200
+    assert pdf_response.headers["content-type"].startswith("application/pdf")
+    assert pdf_response.content.startswith(b"%PDF-")
+
+
 def test_analyze_truth_gate_returns_422(monkeypatch) -> None:
     class HallucinatingClient(FakeOpenAIClient):
         def generate(self, *, system_prompt: str, user_prompt: str, response_model):

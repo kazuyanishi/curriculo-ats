@@ -1,0 +1,19 @@
+import { AnalyzeResponse, CriterionMatchResponse } from "../lib/types";
+import { DownloadButtons } from "./DownloadButtons";
+
+const categoryLabels: Record<string, string> = { skill: "Competência", technology: "Tecnologia", tool: "Ferramenta", language: "Idioma", education: "Formação", experience: "Experiência", certification: "Certificação", other: "Outro" };
+const importanceLabels: Record<string, string> = { required: "Obrigatório", preferred: "Preferencial", unspecified: "Não especificado" };
+
+function MatchCard({ item, muted = false }: { item: CriterionMatchResponse; muted?: boolean }) {
+  return <article className={`rounded-xl border p-4 ${muted ? "border-slate-200 bg-slate-50" : "border-slate-200 bg-white"}`}><div className="flex flex-wrap items-start justify-between gap-2"><div><h4 className="font-bold text-slate-800">{item.criterion.value}</h4><p className="text-xs font-semibold text-slate-500">{categoryLabels[item.criterion.category] ?? item.criterion.category}</p></div><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{importanceLabels[item.criterion.importance]}</span></div><p className="mt-3 break-words text-sm italic text-slate-500">{item.criterion.evidence}</p></article>;
+}
+
+export function AnalysisResult({ analysis }: { analysis: AnalyzeResponse }) {
+  const matches = analysis.matching.filter(item => item.status === "matched");
+  const score = analysis.score.score === null ? "Não calculável" : `${Math.round(analysis.score.score * 100)}%`;
+  const coverage = analysis.score.coverage === null ? "Sem critérios" : `${Math.round(analysis.score.coverage * 100)}%`;
+  const metric = (label: string, value: string | number) => <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-2 text-2xl font-black text-indigo-700">{value}</p></div>;
+  return <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-soft sm:p-7"><div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"><div><h2 className="text-2xl font-black text-slate-800">Resultado da análise</h2><p className="mt-1 text-sm text-slate-500">Veja como seu currículo se alinha aos requisitos encontrados na vaga.</p></div><DownloadButtons candidate={analysis.optimized_candidate} /></div><div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">{metric("Compatibilidade", score)}{metric("Cobertura", coverage)}{metric("Correspondências", matches.length)}{metric("Lacunas", analysis.gaps.gaps.length)}{metric("Não avaliáveis", analysis.gaps.unsupported.length)}</div><ResultSection title="Correspondências" description="Requisitos encontrados no currículo informado." items={matches} empty="Nenhuma correspondência avaliada." /><ResultSection title="Lacunas encontradas" description="Estes requisitos da vaga não foram encontrados no currículo informado." items={analysis.gaps.gaps} empty="Não foram encontradas lacunas entre os critérios avaliados." /><ResultSection title="Não avaliáveis" description="Estes critérios não puderam ser avaliados com segurança pelos dados disponíveis." items={analysis.gaps.unsupported} empty="Todos os critérios extraídos puderam ser avaliados." muted /></section>;
+}
+
+function ResultSection({ title, description, items, empty, muted = false }: { title: string; description: string; items: CriterionMatchResponse[]; empty: string; muted?: boolean }) { return <section className="mt-8"><h3 className="text-lg font-bold text-slate-800">{title}</h3><p className="mt-1 text-sm text-slate-500">{description}</p><div className="mt-4 space-y-3">{items.length ? items.map((item, index) => <MatchCard key={`${item.criterion.value}-${index}`} item={item} muted={muted} />) : <p className="rounded-xl border border-dashed border-slate-300 px-4 py-5 text-sm text-slate-500">{empty}</p>}</div></section>; }
