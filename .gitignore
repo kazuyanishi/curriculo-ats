@@ -5,7 +5,12 @@
 # Environment variables
 .env
 .env.*
+!frontend/.env.example
 *.env
+
+# Frontend local dependencies and build output
+frontend/node_modules/
+frontend/.next/
 
 # Local sensitive data
 data/
