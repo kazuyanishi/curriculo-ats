@@ -1,6 +1,11 @@
 from resume_ai.modules.candidate.domain.entities import Candidate
 from resume_ai.modules.jobs.domain.entities import CriterionCategory, JobCriterion
-from resume_ai.modules.matching.domain.entities import CriterionMatch, MatchStatus
+from resume_ai.modules.matching.domain.entities import (
+    CriterionMatch,
+    MatchingResult,
+    MatchingScore,
+    MatchStatus,
+)
 
 
 def _normalize_name(value: str) -> str:
@@ -75,3 +80,19 @@ class EducationCandidateCriterionMatcher:
                 return CriterionMatch(criterion=criterion, status=MatchStatus.MATCHED)
 
         return CriterionMatch(criterion=criterion, status=MatchStatus.NOT_MATCHED)
+
+
+class MatchingScoreCalculator:
+    def calculate(self, result: MatchingResult) -> MatchingScore:
+        evaluated_count = result.matched_count + result.not_matched_count
+        score = (
+            None
+            if evaluated_count == 0
+            else result.matched_count / evaluated_count
+        )
+        coverage = (
+            None
+            if result.total == 0
+            else evaluated_count / result.total
+        )
+        return MatchingScore(score=score, coverage=coverage)
