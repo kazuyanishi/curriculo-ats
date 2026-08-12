@@ -153,6 +153,62 @@ def test_job_criteria_system_prompt_rejects_empty_and_or_education_structures() 
     assert "never turn education or experience into two mandatory criteria" in prompt
 
 
+def test_job_criteria_system_prompt_documents_experience_structure() -> None:
+    prompt = JOB_CRITERIA_SYSTEM_PROMPT.lower()
+
+    for field in (
+        "experience_requirement",
+        "role",
+        "company",
+        "minimum_duration",
+        "minimum_duration_evidence",
+    ):
+        assert field in prompt
+
+
+def test_job_criteria_system_prompt_requires_literal_experience_grounding() -> None:
+    prompt = JOB_CRITERIA_SYSTEM_PROMPT.lower()
+
+    assert "explicitly identifiable job role" in prompt
+    assert "explicitly identified" in prompt
+    assert "preserve the role literally" in prompt
+    assert "do not infer a company" in prompt
+    assert "software eng." in prompt
+    assert "software engineer" in prompt
+
+
+def test_job_criteria_system_prompt_defines_conservative_experience_duration() -> None:
+    prompt = JOB_CRITERIA_SYSTEM_PROMPT.lower()
+
+    assert "positive integer" in prompt
+    assert "month, months, year, and years" in prompt
+    assert "several years" in prompt
+    assert "3+ years" in prompt
+    assert "2-4 years" in prompt
+    assert "minimum_duration must be null" in prompt
+
+
+def test_job_criteria_system_prompt_requires_duration_provenance() -> None:
+    prompt = JOB_CRITERIA_SYSTEM_PROMPT.lower()
+
+    assert "whenever minimum_duration is not null" in prompt
+    assert "minimum_duration_evidence is required" in prompt
+    assert "smallest sufficient phrase" in prompt
+    assert "copied literally and verbatim" in prompt
+    assert "never paraphrase" in prompt
+
+
+def test_job_criteria_system_prompt_rejects_unrepresentable_experience() -> None:
+    prompt = JOB_CRITERIA_SYSTEM_PROMPT.lower()
+
+    assert "for every category other than experience" in prompt
+    assert "experience_requirement must be null" in prompt
+    assert "strong experience" in prompt
+    assert "customer support" in prompt
+    assert "partial requirements are allowed" in prompt
+    assert "education or experience into two mandatory requirements" in prompt
+
+
 def test_user_prompt_preserves_description_and_excludes_metadata() -> None:
     description = "  Desenvolvedor Python\r\n\r\nRequisitos:\n- Python  "
     job = JobPosting(

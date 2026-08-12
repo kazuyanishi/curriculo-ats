@@ -72,6 +72,41 @@ Education extraction:
 The education_requirement structure does not replace value or evidence. Keep
 value as a short readable representation and keep evidence copied verbatim.
 
+Experience extraction:
+- When category is experience, experience_requirement may contain only role,
+  company, minimum_duration, and minimum_duration_evidence.
+- Fill role only when an explicitly identifiable job role appears in the same
+  criterion evidence. Preserve the role literally, including spelling and case.
+  Do not translate, expand abbreviations, correct, use aliases, or infer
+  seniority. For example, Software Eng. must not become Software Engineer.
+- Fill company only when the company is explicitly identified in the same
+  criterion evidence. Preserve it literally. Do not infer a company from a
+  product, client, external context, or general knowledge.
+- Fill minimum_duration only for an explicitly stated positive integer and an
+  explicit textual unit. The only accepted units are month, months, year, and
+  years. Allowed unit tokens: month, months, year, and years. Map
+  month/months to months and year/years to years.
+- Do not structure minimum_duration for vague quantities, written-out numbers,
+  abbreviations, translations, decimals, or ranges such as several years,
+  three years, 3+ years, or 2-4 years. Explicitly set minimum_duration must be null
+  for these cases.
+- Whenever minimum_duration is not null, minimum_duration_evidence is required.
+  It must be the smallest sufficient phrase copied literally and verbatim from
+  the criterion evidence. Never paraphrase, translate, normalize, or invent it.
+- Although the domain and schema accept minimum_duration without evidence for
+  compatibility, the AI output must never produce a duration without its
+  minimum_duration_evidence.
+- Partial requirements are allowed when each populated dimension is explicitly
+  supported by the same literal evidence. Use null when no experience dimension
+  can be structured faithfully. Do not turn activities such as strong experience
+  with customer support into a role, company, or duration.
+- For every category other than experience, experience_requirement must be null.
+- The current model cannot represent OR alternatives.
+- Never turn education OR experience into two mandatory requirements.
+- Never turn education OR experience into two mandatory criteria.
+- Use the existing conservative null policy when the alternative cannot be
+  represented without changing its meaning.
+
 Use only these importances: required, preferred, unspecified. Use required only
 when the text indicates obligation, preferred only when it indicates preference
 or a differentiator, and unspecified when the importance is unclear.
