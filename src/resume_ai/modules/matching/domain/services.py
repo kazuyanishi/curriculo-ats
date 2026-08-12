@@ -13,6 +13,8 @@ class ExactCandidateCriterionMatcher:
         candidate: Candidate,
         criterion: JobCriterion,
     ) -> CriterionMatch:
+        if criterion.category is CriterionCategory.EDUCATION:
+            return EducationCandidateCriterionMatcher().match(candidate, criterion)
         if criterion.category is CriterionCategory.SKILL:
             items = candidate.skills
         elif criterion.category is CriterionCategory.TECHNOLOGY:
@@ -36,3 +38,40 @@ class ExactCandidateCriterionMatcher:
             else MatchStatus.NOT_MATCHED
         )
         return CriterionMatch(criterion=criterion, status=status)
+
+
+class EducationCandidateCriterionMatcher:
+    def match(
+        self,
+        candidate: Candidate,
+        criterion: JobCriterion,
+    ) -> CriterionMatch:
+        requirement = criterion.education_requirement
+        if (
+            criterion.category is not CriterionCategory.EDUCATION
+            or requirement is None
+            or requirement.degree_level is not None
+            or (requirement.field_of_study is None and requirement.institution is None)
+        ):
+            return CriterionMatch(criterion=criterion, status=MatchStatus.UNSUPPORTED)
+
+        acceptable_statuses = {status.value for status in requirement.acceptable_statuses}
+        for education in candidate.education:
+            field_matches = (
+                requirement.field_of_study is None
+                or _normalize_name(education.course)
+                == _normalize_name(requirement.field_of_study)
+            )
+            institution_matches = (
+                requirement.institution is None
+                or _normalize_name(education.institution)
+                == _normalize_name(requirement.institution)
+            )
+            status_matches = (
+                not acceptable_statuses
+                or education.status.value in acceptable_statuses
+            )
+            if field_matches and institution_matches and status_matches:
+                return CriterionMatch(criterion=criterion, status=MatchStatus.MATCHED)
+
+        return CriterionMatch(criterion=criterion, status=MatchStatus.NOT_MATCHED)

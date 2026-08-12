@@ -1,4 +1,5 @@
 from datetime import date
+from typing import get_type_hints
 
 import pytest
 
@@ -7,6 +8,8 @@ from resume_ai.modules.candidate.domain.entities import (
     Candidate,
     Certification,
     ContactInfo,
+    Education,
+    EducationStatus,
     Experience,
     Language,
     PersonalInfo,
@@ -19,11 +22,15 @@ from resume_ai.modules.candidate.domain.entities import (
 from resume_ai.modules.jobs.domain.entities import (
     CriterionCategory,
     CriterionImportance,
+    EducationRequirement,
     JobCriterion,
 )
 from resume_ai.modules.matching.application.ports import CandidateCriterionMatcher
 from resume_ai.modules.matching.domain.entities import CriterionMatch, MatchStatus
-from resume_ai.modules.matching.domain.services import ExactCandidateCriterionMatcher
+from resume_ai.modules.matching.domain.services import (
+    EducationCandidateCriterionMatcher,
+    ExactCandidateCriterionMatcher,
+)
 
 
 def _candidate(
@@ -35,6 +42,7 @@ def _candidate(
     certifications: tuple[Certification, ...] = (),
     experiences: tuple[Experience, ...] = (),
     projects: tuple[Project, ...] = (),
+    education: tuple[Education, ...] = (),
 ) -> Candidate:
     return Candidate(
         personal_info=PersonalInfo(
@@ -51,6 +59,7 @@ def _candidate(
         certifications=certifications,
         experiences=experiences,
         projects=projects,
+        education=education,
     )
 
 
@@ -141,7 +150,7 @@ def test_categories_are_isolated() -> None:
 
 @pytest.mark.parametrize(
     "category",
-    [CriterionCategory.EDUCATION, CriterionCategory.EXPERIENCE, CriterionCategory.OTHER],
+    [CriterionCategory.EXPERIENCE, CriterionCategory.OTHER],
 )
 def test_unsupported_categories_return_unsupported_status(category: CriterionCategory) -> None:
     criterion = _criterion(category, "Example")
@@ -231,3 +240,47 @@ def test_matcher_is_structurally_compatible_with_the_port() -> None:
 
     assert result.criterion is criterion
     assert result.status is MatchStatus.MATCHED
+
+
+def test_exact_matcher_delegates_structured_education() -> None:
+    education = Education(
+        institution="Example University",
+        course="Computer Science",
+        status=EducationStatus.COMPLETED,
+    )
+    criterion = JobCriterion(
+        category=CriterionCategory.EDUCATION,
+        value="unrelated value",
+        evidence="unrelated evidence",
+        education_requirement=EducationRequirement(field_of_study="Computer Science"),
+    )
+
+    result = ExactCandidateCriterionMatcher().match(
+        _candidate(education=(education,)), criterion
+    )
+
+    assert result.status is MatchStatus.MATCHED
+    assert result.criterion is criterion
+
+
+def test_exact_matcher_keeps_degree_level_education_unsupported() -> None:
+    criterion = JobCriterion(
+        category=CriterionCategory.EDUCATION,
+        value="Computer Science",
+        evidence="Computer Science",
+        education_requirement=EducationRequirement(
+            degree_level="Bachelor's", field_of_study="Computer Science"
+        ),
+    )
+
+    result = ExactCandidateCriterionMatcher().match(_candidate(), criterion)
+
+    assert result.status is MatchStatus.UNSUPPORTED
+
+
+def test_education_matcher_type_hints() -> None:
+    hints = get_type_hints(EducationCandidateCriterionMatcher.match)
+
+    assert hints["candidate"] is Candidate
+    assert hints["criterion"] is JobCriterion
+    assert hints["return"] is CriterionMatch
