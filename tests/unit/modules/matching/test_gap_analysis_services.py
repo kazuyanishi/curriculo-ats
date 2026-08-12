@@ -3,6 +3,8 @@ from typing import get_type_hints
 from resume_ai.modules.jobs.domain.entities import (
     CriterionCategory,
     CriterionImportance,
+    EducationRequirement,
+    ExperienceRequirement,
     JobCriterion,
 )
 from resume_ai.modules.matching.application.services import AnalyzeMatchingGaps
@@ -67,15 +69,39 @@ def test_analyzer_preserves_required_preferred_order() -> None:
 
 
 def test_analyzer_preserves_structured_criterion_references() -> None:
-    education = _match(MatchStatus.NOT_MATCHED, "Education")
-    experience = _match(MatchStatus.NOT_MATCHED, "Experience")
-
-    result = DeterministicGapAnalyzer().analyze(
-        MatchingResult(matches=(education, experience))
+    education_requirement = EducationRequirement(field_of_study="Computer Science")
+    education_criterion = JobCriterion(
+        category=CriterionCategory.EDUCATION,
+        value="Computer Science degree",
+        evidence="Computer Science degree required.",
+        education_requirement=education_requirement,
+    )
+    education_match = CriterionMatch(
+        criterion=education_criterion,
+        status=MatchStatus.NOT_MATCHED,
+    )
+    experience_requirement = ExperienceRequirement(role="Backend Developer")
+    experience_criterion = JobCriterion(
+        category=CriterionCategory.EXPERIENCE,
+        value="Backend Developer experience",
+        evidence="Backend Developer experience required.",
+        experience_requirement=experience_requirement,
+    )
+    experience_match = CriterionMatch(
+        criterion=experience_criterion,
+        status=MatchStatus.NOT_MATCHED,
     )
 
-    assert result.gaps[0].criterion is education.criterion
-    assert result.gaps[1].criterion is experience.criterion
+    result = DeterministicGapAnalyzer().analyze(
+        MatchingResult(matches=(education_match, experience_match))
+    )
+
+    assert result.gaps[0] is education_match
+    assert result.gaps[1] is experience_match
+    assert result.gaps[0].criterion is education_criterion
+    assert result.gaps[1].criterion is experience_criterion
+    assert result.gaps[0].criterion.education_requirement is education_requirement
+    assert result.gaps[1].criterion.experience_requirement is experience_requirement
 
 
 def test_analyze_matching_gaps_delegates_to_analyzer() -> None:
