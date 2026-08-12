@@ -12,6 +12,7 @@ from resume_ai.modules.jobs.infrastructure.text_repository import TextJobReposit
 from resume_ai.modules.matching.application.matchers import DeterministicCandidateJobMatcher
 from resume_ai.modules.matching.application.services import (
     CalculateMatchingScore,
+    MatchAndScoreCandidateToJob,
     MatchCandidateToJob,
 )
 from resume_ai.modules.matching.domain.services import (
@@ -48,3 +49,9 @@ def build_match_candidate_to_job() -> MatchCandidateToJob:
 def build_calculate_matching_score() -> CalculateMatchingScore:
     calculator = MatchingScoreCalculator()
     return CalculateMatchingScore(calculator)
+
+
+def build_match_and_score_candidate_to_job() -> MatchAndScoreCandidateToJob:
+    matcher = build_match_candidate_to_job()
+    score_calculator = build_calculate_matching_score()
+    return MatchAndScoreCandidateToJob(matcher, score_calculator)
