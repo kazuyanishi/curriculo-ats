@@ -15,6 +15,7 @@ from resume_ai.modules.jobs.domain.entities import (
     CriterionImportance,
     EducationRequirement,
     EducationRequirementStatus,
+    EducationRequirementStatusEvidence,
     JobCriterion,
 )
 from resume_ai.modules.matching.domain.entities import CriterionMatch, MatchStatus
@@ -250,6 +251,60 @@ def test_provenance_value_evidence_importance_and_dates_do_not_affect_matching()
         ),
     )
     assert result.status is MatchStatus.MATCHED
+
+
+def test_status_evidence_text_does_not_affect_education_matching() -> None:
+    requirement = EducationRequirement(
+        field_of_study="Computer Science",
+        acceptable_statuses=(EducationRequirementStatus.IN_PROGRESS,),
+        status_evidence=(
+            EducationRequirementStatusEvidence(
+                status=EducationRequirementStatus.IN_PROGRESS,
+                evidence="currently pursuing",
+            ),
+        ),
+    )
+    criterion = _criterion(requirement)
+
+    result = EducationCandidateCriterionMatcher().match(
+        _candidate(
+            _education(
+                course="Computer Science",
+                institution="Example University",
+                status=EducationStatus.IN_PROGRESS,
+            )
+        ),
+        criterion,
+    )
+
+    assert result.status is MatchStatus.MATCHED
+    assert result.criterion is criterion
+
+
+def test_status_evidence_text_does_not_mask_incompatible_candidate_status() -> None:
+    requirement = EducationRequirement(
+        field_of_study="Computer Science",
+        acceptable_statuses=(EducationRequirementStatus.IN_PROGRESS,),
+        status_evidence=(
+            EducationRequirementStatusEvidence(
+                status=EducationRequirementStatus.IN_PROGRESS,
+                evidence="currently pursuing",
+            ),
+        ),
+    )
+
+    result = EducationCandidateCriterionMatcher().match(
+        _candidate(
+            _education(
+                course="Computer Science",
+                institution="Example University",
+                status=EducationStatus.COMPLETED,
+            )
+        ),
+        _criterion(requirement),
+    )
+
+    assert result.status is MatchStatus.NOT_MATCHED
 
 
 def test_result_preserves_criterion_identity() -> None:
