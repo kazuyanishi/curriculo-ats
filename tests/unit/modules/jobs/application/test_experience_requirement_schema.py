@@ -54,6 +54,75 @@ def test_requirement_accepts_each_dimension_and_all_dimensions() -> None:
     )
 
 
+def test_requirement_minimum_duration_evidence_defaults_to_none() -> None:
+    requirement = ExperienceRequirementInput(role="Backend Developer")
+
+    assert requirement.minimum_duration_evidence is None
+
+
+def test_requirement_accepts_duration_with_evidence() -> None:
+    requirement = ExperienceRequirementInput(
+        minimum_duration={"value": 3, "unit": "years"},
+        minimum_duration_evidence="3 years",
+    )
+
+    assert requirement.minimum_duration_evidence == "3 years"
+
+
+def test_requirement_preserves_duration_evidence_exactly() -> None:
+    evidence = "  3 Years of experience  "
+    requirement = ExperienceRequirementInput(
+        minimum_duration={"value": 3, "unit": "years"},
+        minimum_duration_evidence=evidence,
+    )
+
+    assert requirement.minimum_duration_evidence == evidence
+
+
+@pytest.mark.parametrize("value", ["", "   ", "\n\t"])
+def test_requirement_rejects_blank_duration_evidence(value: str) -> None:
+    with pytest.raises(ValidationError):
+        ExperienceRequirementInput(
+            minimum_duration={"value": 3, "unit": "years"},
+            minimum_duration_evidence=value,
+        )
+
+
+@pytest.mark.parametrize("value", [3, True, []])
+def test_requirement_rejects_non_string_duration_evidence(value: object) -> None:
+    with pytest.raises(ValidationError):
+        ExperienceRequirementInput(
+            minimum_duration={"value": 3, "unit": "years"},
+            minimum_duration_evidence=value,
+        )
+
+
+def test_requirement_rejects_evidence_without_duration() -> None:
+    with pytest.raises(ValidationError):
+        ExperienceRequirementInput(
+            role="Backend Developer",
+            minimum_duration_evidence="3 years",
+        )
+
+
+def test_requirement_accepts_duration_without_evidence() -> None:
+    requirement = ExperienceRequirementInput(
+        minimum_duration={"value": 3, "unit": "years"}
+    )
+
+    assert requirement.minimum_duration_evidence is None
+
+
+def test_requirement_accepts_role_duration_and_evidence() -> None:
+    requirement = ExperienceRequirementInput(
+        role="Backend Developer",
+        minimum_duration={"value": 3, "unit": "years"},
+        minimum_duration_evidence="3 years",
+    )
+
+    assert requirement.role == "Backend Developer"
+
+
 @pytest.mark.parametrize("field", ["role", "company"])
 @pytest.mark.parametrize("value", ["", "   ", "\n\t"])
 def test_requirement_rejects_blank_text(field: str, value: str) -> None:
@@ -80,6 +149,7 @@ def test_requirement_to_domain_preserves_text_and_duration() -> None:
         role="  Backend Developer  ",
         company="  Example Corp  ",
         minimum_duration={"value": 3, "unit": "years"},
+        minimum_duration_evidence="  3 years  ",
     )
 
     domain = schema.to_domain()
@@ -90,6 +160,7 @@ def test_requirement_to_domain_preserves_text_and_duration() -> None:
     assert domain.minimum_duration == ExperienceMinimumDuration(
         value=3, unit=ExperienceDurationUnit.YEARS
     )
+    assert domain.minimum_duration_evidence == "  3 years  "
 
 
 def test_experience_criterion_accepts_nested_requirement_and_converts_to_domain() -> None:
@@ -144,3 +215,5 @@ def test_experience_schemas_are_frozen() -> None:
         duration.value = 4
     with pytest.raises(ValidationError):
         requirement.role = "Engineer"
+    with pytest.raises(ValidationError):
+        requirement.minimum_duration_evidence = "3 years"

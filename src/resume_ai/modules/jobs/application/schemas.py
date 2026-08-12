@@ -143,14 +143,26 @@ class ExperienceRequirementInput(_InputSchema):
     role: str | None = None
     company: str | None = None
     minimum_duration: ExperienceMinimumDurationInput | None = None
+    minimum_duration_evidence: str | None = None
 
     _validate_role = field_validator("role")(_require_non_blank_if_present)
     _validate_company = field_validator("company")(_require_non_blank_if_present)
+    _validate_minimum_duration_evidence = field_validator(
+        "minimum_duration_evidence"
+    )(_require_non_blank_if_present)
 
     @model_validator(mode="after")
     def _require_at_least_one_requirement(self) -> "ExperienceRequirementInput":
         if self.role is None and self.company is None and self.minimum_duration is None:
             raise ValueError("experience requirement must define at least one requirement")
+        return self
+
+    @model_validator(mode="after")
+    def _require_duration_for_evidence(self) -> "ExperienceRequirementInput":
+        if self.minimum_duration_evidence is not None and self.minimum_duration is None:
+            raise ValueError(
+                "minimum_duration_evidence requires minimum_duration"
+            )
         return self
 
     def to_domain(self) -> ExperienceRequirement:
@@ -162,6 +174,7 @@ class ExperienceRequirementInput(_InputSchema):
                 if self.minimum_duration is not None
                 else None
             ),
+            minimum_duration_evidence=self.minimum_duration_evidence,
         )
 
 
