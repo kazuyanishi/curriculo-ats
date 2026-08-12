@@ -3,6 +3,7 @@ from typing import get_type_hints
 
 from resume_ai.bootstrap import (
     build_calculate_matching_score,
+    build_match_and_score_candidate_to_job,
     build_match_candidate_to_job,
 )
 from resume_ai.modules.candidate.domain.entities import (
@@ -22,6 +23,7 @@ from resume_ai.modules.jobs.domain.entities import (
 )
 from resume_ai.modules.matching.application.services import (
     CalculateMatchingScore,
+    MatchAndScoreCandidateToJob,
     MatchCandidateToJob,
 )
 from resume_ai.modules.matching.domain.entities import (
@@ -162,3 +164,39 @@ def test_score_builder_signature_and_type_hints() -> None:
 
     assert hints["return"] is CalculateMatchingScore
     assert signature.parameters == {}
+
+
+def test_match_and_score_builder_returns_pipeline_service() -> None:
+    service = build_match_and_score_candidate_to_job()
+
+    assert isinstance(service, MatchAndScoreCandidateToJob)
+
+
+def test_match_and_score_builder_signature_and_type_hints() -> None:
+    hints = get_type_hints(build_match_and_score_candidate_to_job)
+    signature = inspect.signature(build_match_and_score_candidate_to_job)
+
+    assert hints["return"] is MatchAndScoreCandidateToJob
+    assert signature.parameters == {}
+
+
+def test_match_and_score_builder_runs_real_pipeline() -> None:
+    criterion = _criterion(CriterionCategory.TECHNOLOGY, "Python")
+
+    matching_result, matching_score = build_match_and_score_candidate_to_job().execute(
+        _candidate(), JobCriteria(criteria=(criterion,))
+    )
+
+    assert isinstance(matching_result, MatchingResult)
+    assert isinstance(matching_score, MatchingScore)
+    assert matching_result.total == 1
+    assert matching_result.matched_count == 1
+    assert matching_score.score == 1.0
+    assert matching_score.coverage == 1.0
+
+
+def test_match_and_score_builder_returns_independent_service_instances() -> None:
+    first = build_match_and_score_candidate_to_job()
+    second = build_match_and_score_candidate_to_job()
+
+    assert first is not second
