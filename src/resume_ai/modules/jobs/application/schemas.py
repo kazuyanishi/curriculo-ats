@@ -6,6 +6,9 @@ from resume_ai.modules.jobs.domain.entities import (
     EducationRequirement,
     EducationRequirementStatus,
     EducationRequirementStatusEvidence,
+    ExperienceDurationUnit,
+    ExperienceMinimumDuration,
+    ExperienceRequirement,
     JobCriteria,
     JobCriterion,
     JobPosting,
@@ -119,12 +122,56 @@ class EducationRequirementStatusEvidenceInput(_InputSchema):
         )
 
 
+class ExperienceMinimumDurationInput(_InputSchema):
+    value: int
+    unit: ExperienceDurationUnit
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def _validate_positive_value(cls, value: object) -> object:
+        if type(value) is not int:
+            raise ValueError("experience duration value must be an int")
+        if value <= 0:
+            raise ValueError("experience duration value must be greater than zero")
+        return value
+
+    def to_domain(self) -> ExperienceMinimumDuration:
+        return ExperienceMinimumDuration(value=self.value, unit=self.unit)
+
+
+class ExperienceRequirementInput(_InputSchema):
+    role: str | None = None
+    company: str | None = None
+    minimum_duration: ExperienceMinimumDurationInput | None = None
+
+    _validate_role = field_validator("role")(_require_non_blank_if_present)
+    _validate_company = field_validator("company")(_require_non_blank_if_present)
+
+    @model_validator(mode="after")
+    def _require_at_least_one_requirement(self) -> "ExperienceRequirementInput":
+        if self.role is None and self.company is None and self.minimum_duration is None:
+            raise ValueError("experience requirement must define at least one requirement")
+        return self
+
+    def to_domain(self) -> ExperienceRequirement:
+        return ExperienceRequirement(
+            role=self.role,
+            company=self.company,
+            minimum_duration=(
+                self.minimum_duration.to_domain()
+                if self.minimum_duration is not None
+                else None
+            ),
+        )
+
+
 class JobCriterionInput(_InputSchema):
     category: CriterionCategory
     value: str
     evidence: str
     importance: CriterionImportance = CriterionImportance.UNSPECIFIED
     education_requirement: EducationRequirementInput | None = None
+    experience_requirement: ExperienceRequirementInput | None = None
 
     _validate_category_boundary = field_validator("category", mode="before")(
         _reject_importance_as_category
@@ -144,6 +191,17 @@ class JobCriterionInput(_InputSchema):
             raise ValueError("education_requirement requires education criterion category")
         return self
 
+    @model_validator(mode="after")
+    def _validate_experience_requirement_category(self) -> "JobCriterionInput":
+        if (
+            self.experience_requirement is not None
+            and self.category is not CriterionCategory.EXPERIENCE
+        ):
+            raise ValueError(
+                "experience_requirement requires experience criterion category"
+            )
+        return self
+
     def to_domain(self) -> JobCriterion:
         return JobCriterion(
             category=self.category,
@@ -153,6 +211,11 @@ class JobCriterionInput(_InputSchema):
             education_requirement=(
                 self.education_requirement.to_domain()
                 if self.education_requirement is not None
+                else None
+            ),
+            experience_requirement=(
+                self.experience_requirement.to_domain()
+                if self.experience_requirement is not None
                 else None
             ),
         )
