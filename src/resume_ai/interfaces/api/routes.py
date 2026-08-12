@@ -1,0 +1,97 @@
+from dataclasses import asdict, is_dataclass
+from enum import StrEnum
+from typing import Any
+
+from fastapi import APIRouter, HTTPException, Request, Response
+
+from resume_ai.bootstrap import (
+    build_analyze_candidate_for_job,
+    build_generate_candidate_documents,
+)
+from resume_ai.core.exceptions import DomainError
+from resume_ai.integrations.ai.config import load_ai_config
+from resume_ai.interfaces.api.schemas import AnalyzeRequest, AnalyzeResponse
+from resume_ai.modules.candidate.application.schemas import CandidateInput
+from resume_ai.modules.candidate.domain.entities import Candidate
+from resume_ai.modules.jobs.domain.entities import JobPosting
+from resume_ai.modules.optimization.application.services import CandidateAnalysisResult
+
+router = APIRouter()
+
+
+def _json_value(value: Any) -> Any:
+    if isinstance(value, StrEnum):
+        return value.value
+    if is_dataclass(value):
+        return {key: _json_value(item) for key, item in asdict(value).items()}
+    if isinstance(value, tuple):
+        return [_json_value(item) for item in value]
+    if isinstance(value, list):
+        return [_json_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _json_value(item) for key, item in value.items()}
+    return value
+
+
+def _analysis_response(result: CandidateAnalysisResult) -> AnalyzeResponse:
+    return AnalyzeResponse(
+        criteria=[_json_value(item) for item in result.criteria.criteria],
+        matching=[_json_value(item) for item in result.matching.matches],
+        score=_json_value(result.score),
+        gaps={
+            "gaps": [_json_value(item) for item in result.gaps.gaps],
+            "unsupported": [_json_value(item) for item in result.gaps.unsupported],
+        },
+        optimized_candidate=_json_value(result.optimized_candidate),
+    )
+
+
+def _candidate_from_request(request: AnalyzeRequest) -> tuple[Candidate, JobPosting]:
+    return request.candidate.to_domain(), request.job.to_domain()
+
+
+@router.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@router.post("/analyze", response_model=AnalyzeResponse)
+def analyze(request: AnalyzeRequest, http_request: Request) -> AnalyzeResponse:
+    candidate, job = _candidate_from_request(request)
+    ai_config = http_request.app.state.ai_config
+    if ai_config is None:
+        try:
+            ai_config = load_ai_config()
+        except ValueError as error:
+            raise HTTPException(status_code=503, detail="AI configuration unavailable") from error
+    try:
+        result = build_analyze_candidate_for_job(ai_config).execute(candidate, job)
+    except DomainError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(status_code=502, detail="AI integration failed") from error
+    return _analysis_response(result)
+
+
+def _document_response(request: CandidateInput, media_type: str) -> Response:
+    candidate = request.to_domain()
+    documents = build_generate_candidate_documents().execute(candidate)
+    document = documents.docx if media_type != "application/pdf" else documents.pdf
+    return Response(
+        content=document.content,
+        media_type=document.media_type,
+        headers={"Content-Disposition": f'attachment; filename="{document.filename}"'},
+    )
+
+
+@router.post("/documents/docx")
+def document_docx(request: CandidateInput) -> Response:
+    return _document_response(
+        request,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+
+
+@router.post("/documents/pdf")
+def document_pdf(request: CandidateInput) -> Response:
+    return _document_response(request, "application/pdf")
