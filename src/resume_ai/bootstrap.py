@@ -21,6 +21,8 @@ from resume_ai.modules.matching.domain.services import (
     ExactCandidateCriterionMatcher,
     MatchingScoreCalculator,
 )
+from resume_ai.modules.optimization.application.services import OptimizeCandidate
+from resume_ai.modules.optimization.domain.services import DeterministicCandidateOptimizer
 
 
 def build_load_candidate(config: AppConfig) -> LoadCandidate:
@@ -56,6 +58,10 @@ def build_calculate_matching_score() -> CalculateMatchingScore:
 def build_analyze_matching_gaps() -> AnalyzeMatchingGaps:
     analyzer = DeterministicGapAnalyzer()
     return AnalyzeMatchingGaps(analyzer)
+
+
+def build_optimize_candidate() -> OptimizeCandidate:
+    return OptimizeCandidate(DeterministicCandidateOptimizer())
 
 
 def build_match_and_score_candidate_to_job() -> MatchAndScoreCandidateToJob:
