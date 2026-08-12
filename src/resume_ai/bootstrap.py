@@ -21,7 +21,10 @@ from resume_ai.modules.matching.domain.services import (
     ExactCandidateCriterionMatcher,
     MatchingScoreCalculator,
 )
-from resume_ai.modules.optimization.application.services import OptimizeCandidate
+from resume_ai.modules.optimization.application.services import (
+    AnalyzeCandidateForJob,
+    OptimizeCandidate,
+)
 from resume_ai.modules.optimization.domain.services import DeterministicCandidateOptimizer
 
 
@@ -62,6 +65,15 @@ def build_analyze_matching_gaps() -> AnalyzeMatchingGaps:
 
 def build_optimize_candidate() -> OptimizeCandidate:
     return OptimizeCandidate(DeterministicCandidateOptimizer())
+
+
+def build_analyze_candidate_for_job(config: AIConfig) -> AnalyzeCandidateForJob:
+    return AnalyzeCandidateForJob(
+        criteria_extractor=build_extract_job_criteria(config),
+        matcher=build_match_and_score_candidate_to_job(),
+        gap_analyzer=build_analyze_matching_gaps(),
+        optimizer=build_optimize_candidate(),
+    )
 
 
 def build_match_and_score_candidate_to_job() -> MatchAndScoreCandidateToJob:
