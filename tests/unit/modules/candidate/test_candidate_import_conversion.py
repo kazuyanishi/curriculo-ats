@@ -230,6 +230,21 @@ def test_closed_proficiency_and_language_maps() -> None:
     assert issue_codes(draft).count(CandidateImportIssueCode.UNSUPPORTED_LANGUAGE_LEVEL) == 1
 
 
+@pytest.mark.parametrize(
+    "level",
+    ["Básico (iniciante)", "Basico (iniciante)", "Iniciante", "BÁSICO (INICIANTE)"],
+)
+def test_beginner_language_levels_map_to_basic(level: str) -> None:
+    extraction = CandidateResumeExtraction(
+        languages=(ExtractedLanguage(name=evidence("Italiano"), level=evidence(level)),)
+    )
+
+    draft = CandidateResumeDraftConverter().convert(extraction)
+
+    assert draft.languages[0].level is LanguageLevel.BASIC
+    assert CandidateImportIssueCode.UNSUPPORTED_LANGUAGE_LEVEL not in issue_codes(draft)
+
+
 def test_partial_collections_and_nested_values_are_preserved() -> None:
     extraction = CandidateResumeExtraction(
         experiences=(
