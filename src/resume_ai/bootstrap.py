@@ -1,7 +1,17 @@
 from resume_ai.core.config import AppConfig
 from resume_ai.integrations.ai.config import AIConfig
 from resume_ai.integrations.ai.openai_client import OpenAIStructuredAIClient
+from resume_ai.modules.candidate.application.grounding import CandidateResumeTruthGate
+from resume_ai.modules.candidate.application.import_conversion import (
+    CandidateResumeDraftConverter,
+)
+from resume_ai.modules.candidate.application.import_pipeline import (
+    ImportCandidateFromResumeText,
+)
 from resume_ai.modules.candidate.application.services import LoadCandidate
+from resume_ai.modules.candidate.infrastructure.ai_candidate_extractor import (
+    AIResumeCandidateExtractor,
+)
 from resume_ai.modules.candidate.infrastructure.json_repository import (
     JsonCandidateRepository,
 )
@@ -48,6 +58,18 @@ def build_extract_job_criteria(config: AIConfig) -> ExtractJobCriteria:
     extractor = AIJobCriteriaExtractor(client)
     truth_gate = JobCriteriaTruthGate()
     return ExtractJobCriteria(extractor, truth_gate)
+
+
+def build_import_candidate_from_resume_text(
+    config: AIConfig,
+) -> ImportCandidateFromResumeText:
+    client = OpenAIStructuredAIClient(config)
+    extractor = AIResumeCandidateExtractor(client)
+    return ImportCandidateFromResumeText(
+        extractor=extractor,
+        truth_gate=CandidateResumeTruthGate(),
+        converter=CandidateResumeDraftConverter(),
+    )
 
 
 def build_match_candidate_to_job() -> MatchCandidateToJob:

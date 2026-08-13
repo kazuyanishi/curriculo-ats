@@ -1,22 +1,36 @@
 from dataclasses import asdict, is_dataclass
 from enum import StrEnum
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
 
 from resume_ai.bootstrap import (
     build_analyze_candidate_for_job,
     build_generate_candidate_documents,
+    build_import_candidate_from_resume_text,
 )
 from resume_ai.core.exceptions import DomainError
 from resume_ai.integrations.ai.config import load_ai_config
 from resume_ai.interfaces.api.schemas import AnalyzeRequest, AnalyzeResponse
+from resume_ai.modules.candidate.application.exceptions import (
+    ResumeCandidateGroundingError,
+    ResumeTextExtractionError,
+)
+from resume_ai.modules.candidate.application.import_draft import CandidateImportDraft
 from resume_ai.modules.candidate.application.schemas import CandidateInput
 from resume_ai.modules.candidate.domain.entities import Candidate
+from resume_ai.modules.candidate.infrastructure.docx_text_extractor import (
+    DocxResumeTextExtractor,
+)
+from resume_ai.modules.candidate.infrastructure.pdf_text_extractor import (
+    PdfResumeTextExtractor,
+)
 from resume_ai.modules.jobs.domain.entities import JobPosting
 from resume_ai.modules.optimization.application.services import CandidateAnalysisResult
 
 router = APIRouter()
+
+MAX_RESUME_FILE_BYTES = 5 * 1024 * 1024
 
 
 def _json_value(value: Any) -> Any:
@@ -53,6 +67,55 @@ def _candidate_from_request(request: AnalyzeRequest) -> tuple[Candidate, JobPost
 @router.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@router.post("/candidate/import", response_model=CandidateImportDraft)
+async def import_candidate_resume(
+    http_request: Request,
+    file: Annotated[UploadFile, File(...)],
+) -> CandidateImportDraft:
+    try:
+        filename = file.filename or ""
+        suffix = filename.rsplit(".", 1)[-1].casefold() if "." in filename else ""
+        if suffix not in {"pdf", "docx"}:
+            raise HTTPException(status_code=415, detail="Unsupported resume file type")
+
+        content = await file.read(MAX_RESUME_FILE_BYTES + 1)
+        if len(content) > MAX_RESUME_FILE_BYTES:
+            raise HTTPException(status_code=413, detail="Resume file is too large")
+        if not content:
+            raise HTTPException(status_code=422, detail="Resume file is empty")
+
+        text_extractor = PdfResumeTextExtractor() if suffix == "pdf" else DocxResumeTextExtractor()
+        try:
+            resume_text = text_extractor.extract(content)
+        except ResumeTextExtractionError as error:
+            raise HTTPException(
+                status_code=422, detail="Could not extract text from resume"
+            ) from error
+
+        if not resume_text.strip():
+            raise HTTPException(status_code=422, detail="Resume contains no extractable text")
+
+        ai_config = http_request.app.state.ai_config
+        if ai_config is None:
+            try:
+                ai_config = load_ai_config()
+            except ValueError as error:
+                raise HTTPException(
+                    status_code=503, detail="AI configuration unavailable"
+                ) from error
+
+        try:
+            return build_import_candidate_from_resume_text(ai_config).execute(resume_text)
+        except ResumeCandidateGroundingError as error:
+            raise HTTPException(
+                status_code=422, detail="Resume extraction could not be validated"
+            ) from error
+        except Exception as error:
+            raise HTTPException(status_code=502, detail="AI integration failed") from error
+    finally:
+        await file.close()
 
 
 @router.post("/analyze", response_model=AnalyzeResponse)
