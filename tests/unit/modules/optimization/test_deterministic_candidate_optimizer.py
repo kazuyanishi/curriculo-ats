@@ -1,4 +1,4 @@
-from datetime import date
+
 from typing import get_type_hints
 
 from resume_ai.modules.candidate.domain.entities import (
@@ -15,6 +15,7 @@ from resume_ai.modules.candidate.domain.entities import (
     Technology,
     Tool,
 )
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 from resume_ai.modules.jobs.domain.entities import CriterionCategory, JobCriterion
 from resume_ai.modules.matching.domain.entities import (
     CriterionMatch,
@@ -29,7 +30,7 @@ def _candidate() -> Candidate:
         personal_info=PersonalInfo("Jane Doe", "Curitiba", "PR", "Brazil"),
         contact_info=ContactInfo("jane@example.com", "+55"),
         experiences=(
-            Experience("Example Corp", "Backend Developer", date(2020, 1, 1)),
+            Experience("Example Corp", "Backend Developer", YearMonth("2020-01")),
         ),
         education=(Education("Example University", "Computer Science", EducationStatus.COMPLETED),),
         skills=(Skill("Leadership"), Skill("Python"), Skill("Communication")),

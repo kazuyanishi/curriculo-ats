@@ -1,5 +1,4 @@
 import json
-from datetime import date
 
 import pytest
 from pydantic import ValidationError
@@ -13,6 +12,7 @@ from resume_ai.modules.candidate.domain.entities import (
     LanguageLevel,
     ProficiencyLevel,
 )
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 
 
 def _minimum_json() -> str:
@@ -54,7 +54,7 @@ def _complete_json() -> str:
                 {
                     "company": "Example Systems",
                     "role": "Support Analyst",
-                    "start_date": "2024-01-01",
+                    "start_date": "2024-01",
                     "end_date": None,
                     "activities": [{"description": "Provided technical support"}],
                     "achievements": [{"description": "Improved response workflow"}],
@@ -65,8 +65,8 @@ def _complete_json() -> str:
                     "institution": "Example University",
                     "course": "Computer Science",
                     "status": "completed",
-                    "start_date": "2020-01-01",
-                    "end_date": "2024-01-01",
+                    "start_date": "2020-01",
+                    "end_date": "2024-01",
                 }
             ],
             "skills": [
@@ -91,7 +91,7 @@ def _complete_json() -> str:
                 {
                     "name": "Example Project",
                     "description": "Example project description",
-                    "start_date": "2024-01-01",
+                    "start_date": "2024-01",
                     "end_date": None,
                     "technologies": ["Python", "FastAPI"],
                     "url": None,
@@ -118,7 +118,7 @@ def test_complete_json_converts_nested_data_to_domain() -> None:
     assert isinstance(candidate, Candidate)
     assert isinstance(candidate.experiences[0], Experience)
     assert isinstance(candidate.experiences[0].activities[0], Activity)
-    assert candidate.experiences[0].start_date == date(2024, 1, 1)
+    assert candidate.experiences[0].start_date == YearMonth("2024-01")
     assert candidate.education[0].status is EducationStatus.COMPLETED
     assert candidate.technologies[0].level is ProficiencyLevel.ADVANCED
     assert candidate.languages[0].level is LanguageLevel.FLUENT

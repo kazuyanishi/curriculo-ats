@@ -1,5 +1,4 @@
 from dataclasses import FrozenInstanceError
-from datetime import date
 
 import pytest
 
@@ -9,6 +8,7 @@ from resume_ai.modules.candidate.domain.entities import (
     Activity,
     Experience,
 )
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 
 
 @pytest.mark.parametrize("entity_type", [Activity, Achievement])
@@ -29,7 +29,7 @@ def test_experience_accepts_minimum_data_and_current_employment() -> None:
     experience = Experience(
         company="Example Systems",
         role="Support Analyst",
-        start_date=date(2024, 10, 1),
+        start_date=YearMonth("2024-10"),
     )
 
     assert experience.end_date is None
@@ -46,8 +46,8 @@ def test_experience_accepts_complete_data() -> None:
     experience = Experience(
         company="Example Systems",
         role="Support Analyst",
-        start_date=date(2024, 10, 1),
-        end_date=date(2025, 10, 1),
+        start_date=YearMonth("2024-10"),
+        end_date=YearMonth("2025-10"),
         activities=activities,
         achievements=achievements,
     )
@@ -64,7 +64,7 @@ def test_experience_rejects_empty_company_or_role(field: str, value: str) -> Non
     values = {
         "company": "Example Systems",
         "role": "Support Analyst",
-        "start_date": date(2024, 10, 1),
+        "start_date": YearMonth("2024-10"),
     }
     values[field] = value
 
@@ -74,13 +74,13 @@ def test_experience_rejects_empty_company_or_role(field: str, value: str) -> Non
 
 @pytest.mark.parametrize("start_date", [None, "2024-10"])
 def test_experience_rejects_invalid_start_date(start_date) -> None:
-    with pytest.raises(DomainError, match="start_date must be a date"):
+    with pytest.raises(DomainError, match="start_date must be a YearMonth"):
         Experience("Example Systems", "Support Analyst", start_date)
 
 
 def test_experience_rejects_invalid_end_date() -> None:
-    with pytest.raises(DomainError, match="end_date must be a date or None"):
-        Experience("Example Systems", "Support Analyst", date(2024, 10, 1), "2025-01")
+    with pytest.raises(DomainError, match="end_date must be a YearMonth or None"):
+        Experience("Example Systems", "Support Analyst", YearMonth("2024-10"), "2025-01")
 
 
 def test_experience_rejects_end_date_before_start_date() -> None:
@@ -88,13 +88,13 @@ def test_experience_rejects_end_date_before_start_date() -> None:
         Experience(
             "Example Systems",
             "Support Analyst",
-            date(2025, 1, 1),
-            date(2024, 12, 1),
+            YearMonth("2025-01"),
+            YearMonth("2024-12"),
         )
 
 
 def test_experience_accepts_same_start_and_end_date() -> None:
-    same_date = date(2025, 1, 1)
+    same_date = YearMonth("2025-01")
 
     experience = Experience("Example Systems", "Support Analyst", same_date, same_date)
 
@@ -104,7 +104,9 @@ def test_experience_accepts_same_start_and_end_date() -> None:
 @pytest.mark.parametrize("activities", [[Activity("Support users")], ("Support users",)])
 def test_experience_rejects_invalid_activities_collection(activities) -> None:
     with pytest.raises(DomainError):
-        Experience("Example Systems", "Support Analyst", date(2024, 10, 1), activities=activities)
+        Experience(
+            "Example Systems", "Support Analyst", YearMonth("2024-10"), activities=activities
+        )
 
 
 @pytest.mark.parametrize(
@@ -115,13 +117,13 @@ def test_experience_rejects_invalid_achievements_collection(achievements) -> Non
         Experience(
             "Example Systems",
             "Support Analyst",
-            date(2024, 10, 1),
+            YearMonth("2024-10"),
             achievements=achievements,
         )
 
 
 def test_experience_is_immutable() -> None:
-    experience = Experience("Example Systems", "Support Analyst", date(2024, 10, 1))
+    experience = Experience("Example Systems", "Support Analyst", YearMonth("2024-10"))
 
     with pytest.raises(FrozenInstanceError):
         experience.company = "Other Systems"

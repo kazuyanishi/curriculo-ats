@@ -9,6 +9,7 @@ from resume_ai.modules.candidate.application.schemas import (
     ExperienceInput,
 )
 from resume_ai.modules.candidate.domain.entities import Achievement, Activity
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 
 
 @pytest.mark.parametrize("schema_type", [ActivityInput, AchievementInput])
@@ -36,28 +37,35 @@ def test_experience_accepts_iso_string_date_and_defaults() -> None:
     schema = ExperienceInput(
         company="Example Systems",
         role="Support Analyst",
-        start_date="2024-10-01",
+        start_date="2024-10",
     )
 
-    assert schema.start_date == date(2024, 10, 1)
+    assert schema.start_date == YearMonth("2024-10")
     assert schema.end_date is None
     assert schema.activities == ()
     assert schema.achievements == ()
 
 
-def test_experience_accepts_native_date() -> None:
-    schema = ExperienceInput(
-        company="Example Systems",
-        role="Support Analyst",
-        start_date=date(2024, 10, 1),
-    )
-
-    assert schema.start_date == date(2024, 10, 1)
+def test_experience_rejects_native_date() -> None:
+    with pytest.raises(ValidationError):
+        ExperienceInput(
+            company="Example Systems", role="Support Analyst", start_date=date(2024, 10, 1)
+        )
 
 
 @pytest.mark.parametrize(
     "value",
-    ["2024-10", "10/01/2024", "20241001", "not-a-date", 0, 123, 123.45, datetime(2024, 10, 1)],
+    [
+        "2024-10-01",
+        "10/2024",
+        "10/01/2024",
+        "20241001",
+        "not-a-date",
+        0,
+        123,
+        123.45,
+        datetime(2024, 10, 1),
+    ],
 )
 def test_experience_rejects_invalid_start_date(value) -> None:
     with pytest.raises(ValidationError):
@@ -67,7 +75,7 @@ def test_experience_rejects_invalid_start_date(value) -> None:
 @pytest.mark.parametrize("field", ["company", "role"])
 @pytest.mark.parametrize("value", ["", "   "])
 def test_experience_rejects_blank_text(field: str, value: str) -> None:
-    values = {"company": "Example", "role": "Analyst", "start_date": "2024-10-01"}
+    values = {"company": "Example", "role": "Analyst", "start_date": "2024-10"}
     values[field] = value
 
     with pytest.raises(ValidationError):
@@ -79,8 +87,8 @@ def test_experience_rejects_end_date_before_start_date() -> None:
         ExperienceInput(
             company="Example",
             role="Analyst",
-            start_date="2024-10-02",
-            end_date="2024-10-01",
+            start_date="2024-11",
+            end_date="2024-10",
         )
 
 
@@ -88,8 +96,8 @@ def test_experience_accepts_same_date() -> None:
     schema = ExperienceInput(
         company="Example",
         role="Analyst",
-        start_date="2024-10-01",
-        end_date="2024-10-01",
+        start_date="2024-10",
+        end_date="2024-10",
     )
 
     assert schema.end_date == schema.start_date
@@ -99,7 +107,7 @@ def test_experience_accepts_external_lists_as_tuples() -> None:
     schema = ExperienceInput(
         company="Example",
         role="Analyst",
-        start_date="2024-10-01",
+        start_date="2024-10",
         activities=[{"description": "First"}, {"description": "Second"}],
         achievements=[{"description": "Won award"}, {"description": "Saved time"}],
     )
@@ -119,7 +127,7 @@ def test_experience_accepts_external_lists_as_tuples() -> None:
 def test_experience_rejects_string_activity() -> None:
     with pytest.raises(ValidationError):
         ExperienceInput(
-            company="Example", role="Analyst", start_date="2024-10-01", activities=["Support"]
+            company="Example", role="Analyst", start_date="2024-10", activities=["Support"]
         )
 
 
@@ -128,6 +136,6 @@ def test_experience_rejects_extra_nested_activity_field() -> None:
         ExperienceInput(
             company="Example",
             role="Analyst",
-            start_date="2024-10-01",
+            start_date="2024-10",
             activities=[{"description": "Support", "score": 100}],
         )

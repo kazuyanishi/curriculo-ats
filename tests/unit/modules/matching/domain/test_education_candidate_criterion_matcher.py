@@ -10,6 +10,7 @@ from resume_ai.modules.candidate.domain.entities import (
     EducationStatus,
     PersonalInfo,
 )
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 from resume_ai.modules.jobs.domain.entities import (
     CriterionCategory,
     CriterionImportance,
@@ -241,7 +242,7 @@ def test_empty_candidate_education_is_not_matched() -> None:
 def test_provenance_value_evidence_importance_and_dates_do_not_affect_matching() -> None:
     result = EducationCandidateCriterionMatcher().match(
         _candidate(
-            _education(start_date=date(2018, 1, 1), end_date=date(2022, 1, 1))
+            _education(start_date=YearMonth("2018-01"), end_date=YearMonth("2022-01"))
         ),
         _criterion(
             EducationRequirement(field_of_study="Computer Science"),

@@ -1,4 +1,4 @@
-from datetime import date
+
 from pathlib import Path
 
 import pytest
@@ -12,6 +12,7 @@ from resume_ai.modules.candidate.domain.entities import (
     ProficiencyLevel,
 )
 from resume_ai.modules.candidate.domain.repositories import CandidateRepository
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 from resume_ai.modules.candidate.infrastructure.json_repository import (
     JsonCandidateRepository,
 )
@@ -57,7 +58,7 @@ def _nested_json() -> str:
         {
           "company": "Example Systems",
           "role": "Support Analyst",
-          "start_date": "2024-01-01",
+          "start_date": "2024-01",
           "activities": [{"description": "  Provided support  "}],
           "achievements": [{"description": "Improved workflow"}]
         }
@@ -68,7 +69,7 @@ def _nested_json() -> str:
         {
           "name": "Example Project",
           "description": "Example project description",
-          "start_date": "2024-01-01",
+          "start_date": "2024-01",
           "technologies": ["Python", "FastAPI"]
         }
       ]
@@ -105,7 +106,7 @@ def test_json_repository_converts_nested_domain_data(tmp_path: Path) -> None:
     assert candidate.personal_info.full_name == "  Jane Doe  "
     assert candidate.personal_info.city == "São José"
     assert isinstance(candidate.experiences[0].activities[0], Activity)
-    assert candidate.experiences[0].start_date == date(2024, 1, 1)
+    assert candidate.experiences[0].start_date == YearMonth("2024-01")
     assert candidate.technologies[0].level is ProficiencyLevel.ADVANCED
     assert isinstance(candidate.languages[0], Language)
     assert candidate.languages[0].level is LanguageLevel.FLUENT

@@ -1,10 +1,12 @@
-from datetime import date, datetime
+
+from datetime import datetime
 
 import pytest
 from pydantic import ValidationError
 
 from resume_ai.modules.candidate.application.schemas import ProjectInput
 from resume_ai.modules.candidate.domain.entities import Project, Technology
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 
 
 def test_project_minimum_defaults_optional_fields() -> None:
@@ -21,8 +23,8 @@ def test_project_accepts_external_technology_list_and_preserves_stack() -> None:
     schema = ProjectInput(
         name="Example Project",
         description="Example description",
-        start_date="2024-01-01",
-        end_date="2025-01-01",
+        start_date="2024-01",
+        end_date="2025-01",
         technologies=stack,
         url="https://Example.com/MyProject",
     )
@@ -31,8 +33,8 @@ def test_project_accepts_external_technology_list_and_preserves_stack() -> None:
     assert schema.technologies == tuple(stack)
     assert isinstance(domain, Project)
     assert domain.technologies == tuple(stack)
-    assert domain.start_date == date(2024, 1, 1)
-    assert domain.end_date == date(2025, 1, 1)
+    assert domain.start_date == YearMonth("2024-01")
+    assert domain.end_date == YearMonth("2025-01")
     assert domain.url == "https://Example.com/MyProject"
 
 
@@ -48,7 +50,7 @@ def test_project_rejects_blank_required_text(field: str, value: str) -> None:
 
 @pytest.mark.parametrize(
     "value",
-    ["2025-01", "01/2025", "20250101", 123, datetime(2025, 1, 1)],
+    ["2025-01-01", "01/2025", "20250101", 123, datetime(2025, 1, 1)],
 )
 def test_project_rejects_invalid_dates(value) -> None:
     with pytest.raises(ValidationError):
@@ -60,8 +62,8 @@ def test_project_rejects_end_date_before_start_date() -> None:
         ProjectInput(
             name="Project",
             description="Description",
-            start_date="2025-01-02",
-            end_date="2025-01-01",
+            start_date="2025-02",
+            end_date="2025-01",
         )
 
 

@@ -8,7 +8,7 @@ from resume_ai.modules.candidate.domain.entities import Candidate
 
 
 def _date(value: object) -> str:
-    return value.strftime("%Y-%m")
+    return str(value) if not hasattr(value, "strftime") else value.strftime("%Y-%m")
 
 
 def _text(value: str) -> str:

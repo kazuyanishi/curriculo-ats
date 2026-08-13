@@ -25,6 +25,12 @@ function isCandidate(value: unknown): value is Candidate {
   const links = value.professional_links;
   return isObject(personalInfo) && hasStrings(personalInfo, ["full_name", "city", "state", "country"]) && isObject(contactInfo) && hasStrings(contactInfo, ["email", "phone"]) && isObject(links) && ["linkedin", "github", "portfolio"].every(field => isNullableString(links[field])) && Array.isArray(value.experiences) && value.experiences.every(isExperience) && Array.isArray(value.education) && value.education.every(isEducation) && Array.isArray(value.skills) && value.skills.every(isNamedItem) && Array.isArray(value.technologies) && value.technologies.every(isNamedItem) && Array.isArray(value.tools) && value.tools.every(isNamedItem) && Array.isArray(value.languages) && value.languages.every(isLanguage) && Array.isArray(value.certifications) && value.certifications.every(isCertification) && Array.isArray(value.projects) && value.projects.every(isProject);
 }
+function isLegacyCandidate(value: unknown): value is Candidate {
+  if (!isObject(value)) return false;
+  const collections = ["experiences", "education", "skills", "technologies", "tools", "languages", "certifications", "projects"];
+  return isObject(value.personal_info) && isObject(value.contact_info) && isObject(value.professional_links)
+    && collections.every(name => Array.isArray(value[name]) && value[name].every(isObject));
+}
 function toMonth(value: unknown): unknown { return isString(value) && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.slice(0, 7) : value; }
 function migrateCandidate(candidate: Candidate): Candidate {
   return { ...candidate, experiences: candidate.experiences.map(item => ({ ...item, start_date: String(toMonth(item.start_date)), end_date: item.end_date === null ? null : String(toMonth(item.end_date)) })), education: candidate.education.map(item => ({ ...item, start_date: item.start_date === null ? null : String(toMonth(item.start_date)), end_date: item.end_date === null ? null : String(toMonth(item.end_date)) })), projects: candidate.projects.map(item => ({ ...item, start_date: item.start_date === null ? null : String(toMonth(item.start_date)), end_date: item.end_date === null ? null : String(toMonth(item.end_date)) })) };
@@ -34,7 +40,7 @@ function readStored(key: string): { version: number; candidate: Candidate } | nu
   let raw: string | null;
   try { raw = window.localStorage.getItem(key); } catch { return null; }
   if (!raw) return null;
-  try { const parsed: unknown = JSON.parse(raw); return isObject(parsed) && typeof parsed.version === "number" && (isCandidate(parsed.candidate) || (parsed.version === 1 && isObject(parsed.candidate))) ? { version: parsed.version, candidate: parsed.candidate as Candidate } : null; } catch { return null; }
+  try { const parsed: unknown = JSON.parse(raw); return isObject(parsed) && typeof parsed.version === "number" && (isCandidate(parsed.candidate) || (parsed.version === 1 && isLegacyCandidate(parsed.candidate))) ? { version: parsed.version, candidate: parsed.candidate } : null; } catch { return null; }
 }
 export function loadStoredCandidate(): Candidate | null {
   if (typeof window === "undefined") return null;

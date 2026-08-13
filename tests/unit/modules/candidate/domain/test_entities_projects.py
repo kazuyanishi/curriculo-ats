@@ -1,10 +1,10 @@
 from dataclasses import FrozenInstanceError
-from datetime import date
 
 import pytest
 
 from resume_ai.core.exceptions import DomainError
 from resume_ai.modules.candidate.domain.entities import Project, Technology
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 
 
 def test_project_accepts_minimum_data() -> None:
@@ -17,8 +17,8 @@ def test_project_accepts_minimum_data() -> None:
 
 
 def test_project_accepts_complete_data_and_preserves_values() -> None:
-    start_date = date(2025, 1, 1)
-    end_date = date(2026, 1, 1)
+    start_date = YearMonth("2025-01")
+    end_date = YearMonth("2026-01")
     technologies = ("Python", "FastAPI", "PostgreSQL")
     url = "https://Example.com/MyProject"
     project = Project(
@@ -53,12 +53,12 @@ def test_project_rejects_string_dates(field: str) -> None:
     values = {"name": "Example Project", "description": "Example description"}
     values[field] = "2025-01"
 
-    with pytest.raises(DomainError, match=f"{field} must be a date or None"):
+    with pytest.raises(DomainError, match=f"{field} must be a YearMonth or None"):
         Project(**values)
 
 
 def test_project_accepts_partial_dates_and_same_date() -> None:
-    start_date = date(2025, 1, 1)
+    start_date = YearMonth("2025-01")
 
     only_start = Project("Example Project", "Example description", start_date=start_date)
     only_end = Project("Example Project", "Example description", end_date=start_date)
@@ -78,8 +78,8 @@ def test_project_rejects_end_date_before_start_date() -> None:
         Project(
             "Example Project",
             "Example description",
-            date(2026, 1, 1),
-            date(2025, 1, 1),
+            YearMonth("2026-01"),
+            YearMonth("2025-01"),
         )
 
 

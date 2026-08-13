@@ -55,7 +55,7 @@ def _required_value(
     return value
 
 
-def _try_iso_date(
+def _try_month(
     field: ResumeFieldEvidence | None,
     path: str,
     issues: list[CandidateImportIssue],
@@ -104,6 +104,25 @@ def _try_iso_date(
         return None
 
     return value[:7]
+
+
+def _try_full_date(
+    field: ResumeFieldEvidence | None,
+    path: str,
+    issues: list[CandidateImportIssue],
+) -> str | None:
+    value = _value(field)
+    if value is None:
+        return None
+    if len(value) != 10 or value[4] != "-" or value[7] != "-":
+        _issue(issues, path, CandidateImportIssueCode.UNSUPPORTED_DATE_FORMAT, value)
+        return None
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        _issue(issues, path, CandidateImportIssueCode.UNSUPPORTED_DATE_FORMAT, value)
+        return None
+    return value
 
 
 def _map_closed(
@@ -175,10 +194,10 @@ def _convert_experience(
     return ExperienceDraft(
         company=_required_value(item.company, f"{prefix}.company", issues),
         role=_required_value(item.role, f"{prefix}.role", issues),
-        start_date=_try_iso_date(item.start_date, f"{prefix}.start_date", issues)
+        start_date=_try_month(item.start_date, f"{prefix}.start_date", issues)
         if item.start_date is not None
         else _required_value(None, f"{prefix}.start_date", issues),
-        end_date=_try_iso_date(item.end_date, f"{prefix}.end_date", issues, allow_current=True),
+        end_date=_try_month(item.end_date, f"{prefix}.end_date", issues, allow_current=True),
         activities=tuple(field.value for field in item.activities),
         achievements=tuple(field.value for field in item.achievements),
     )
@@ -203,8 +222,8 @@ def _convert_education(
         institution=_required_value(item.institution, f"{prefix}.institution", issues),
         course=_required_value(item.course, f"{prefix}.course", issues),
         status=status,
-        start_date=_try_iso_date(item.start_date, f"{prefix}.start_date", issues),
-        end_date=_try_iso_date(item.end_date, f"{prefix}.end_date", issues),
+        start_date=_try_month(item.start_date, f"{prefix}.start_date", issues),
+        end_date=_try_month(item.end_date, f"{prefix}.end_date", issues),
     )
 
 
@@ -248,8 +267,8 @@ def _convert_certification(
     return CertificationDraft(
         name=_required_value(item.name, f"{prefix}.name", issues),
         issuer=_required_value(item.issuer, f"{prefix}.issuer", issues),
-        issue_date=_try_iso_date(item.issue_date, f"{prefix}.issue_date", issues),
-        expiration_date=_try_iso_date(
+        issue_date=_try_full_date(item.issue_date, f"{prefix}.issue_date", issues),
+        expiration_date=_try_full_date(
             item.expiration_date, f"{prefix}.expiration_date", issues
         ),
         credential_id=_value(item.credential_id),
@@ -266,8 +285,8 @@ def _convert_project(
     return ProjectDraft(
         name=_required_value(item.name, f"{prefix}.name", issues),
         description=_required_value(item.description, f"{prefix}.description", issues),
-        start_date=_try_iso_date(item.start_date, f"{prefix}.start_date", issues),
-        end_date=_try_iso_date(item.end_date, f"{prefix}.end_date", issues, allow_current=True),
+        start_date=_try_month(item.start_date, f"{prefix}.start_date", issues),
+        end_date=_try_month(item.end_date, f"{prefix}.end_date", issues, allow_current=True),
         technologies=tuple(field.value for field in item.technologies),
         url=_value(item.url),
     )

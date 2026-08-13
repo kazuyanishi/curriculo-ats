@@ -1,4 +1,3 @@
-from datetime import date
 from typing import get_type_hints
 
 import pytest
@@ -11,6 +10,7 @@ from resume_ai.modules.candidate.domain.entities import (
     Experience,
     PersonalInfo,
 )
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 from resume_ai.modules.jobs.domain.entities import (
     CriterionCategory,
     CriterionImportance,
@@ -26,6 +26,9 @@ from resume_ai.modules.matching.domain.services import (
     complete_calendar_months,
 )
 
+START_MONTH = YearMonth("2020-01")
+END_MONTH = YearMonth("2023-01")
+
 
 def _candidate(*experiences: Experience) -> Candidate:
     return Candidate(
@@ -39,8 +42,8 @@ def _experience(
     role: str = "Backend Developer",
     company: str = "Example Corp",
     *,
-    start_date: date = date(2020, 1, 1),
-    end_date: date | None = date(2023, 1, 1),
+    start_date: YearMonth = START_MONTH,
+    end_date: YearMonth | None = END_MONTH,
     activities: tuple[Activity, ...] = (),
     achievements: tuple[Achievement, ...] = (),
 ) -> Experience:
@@ -84,15 +87,15 @@ def test_unsupported_category_or_missing_requirement_is_unsupported(
 
 
 def test_complete_calendar_months_counts_full_years() -> None:
-    assert complete_calendar_months(date(2020, 1, 1), date(2023, 1, 1)) == 36
+    assert complete_calendar_months(YearMonth("2020-01"), YearMonth("2023-01")) == 36
 
 
 def test_complete_calendar_months_excludes_partial_month() -> None:
-    assert complete_calendar_months(date(2020, 1, 15), date(2023, 1, 14)) == 35
+    assert complete_calendar_months(YearMonth("2020-01"), YearMonth("2023-01")) == 36
 
 
 def test_complete_calendar_months_returns_zero_for_same_date() -> None:
-    same_date = date(2020, 1, 1)
+    same_date = YearMonth("2020-01")
 
     assert complete_calendar_months(same_date, same_date) == 0
 
@@ -117,7 +120,7 @@ def test_years_duration_does_not_match_partial_year() -> None:
         minimum_duration=ExperienceMinimumDuration(3, ExperienceDurationUnit.YEARS),
         minimum_duration_evidence="3 years",
     )
-    experience = _experience(end_date=date(2022, 12, 31))
+    experience = _experience(end_date=YearMonth("2022-12"))
 
     result = ExperienceCandidateCriterionMatcher().match(
         _candidate(experience), _criterion(requirement)
@@ -134,7 +137,7 @@ def test_months_duration_matches_exact_months() -> None:
     )
 
     result = ExperienceCandidateCriterionMatcher().match(
-        _candidate(_experience(end_date=date(2020, 4, 1))), _criterion(requirement)
+        _candidate(_experience(end_date=YearMonth("2020-04"))), _criterion(requirement)
     )
 
     assert result.status is MatchStatus.MATCHED
@@ -148,7 +151,7 @@ def test_partial_month_does_not_count_for_duration() -> None:
     )
 
     result = ExperienceCandidateCriterionMatcher().match(
-        _candidate(_experience(end_date=date(2020, 3, 31))), _criterion(requirement)
+        _candidate(_experience(end_date=YearMonth("2020-03"))), _criterion(requirement)
     )
 
     assert result.status is MatchStatus.NOT_MATCHED
@@ -203,8 +206,8 @@ def test_role_and_duration_must_match_same_experience() -> None:
         minimum_duration_evidence="3 years",
     )
     candidate = _candidate(
-        _experience(end_date=date(2022, 1, 1)),
-        _experience(role="Support Analyst", end_date=date(2024, 1, 1)),
+        _experience(end_date=YearMonth("2022-01")),
+        _experience(role="Support Analyst", end_date=YearMonth("2024-01")),
     )
 
     result = ExperienceCandidateCriterionMatcher().match(candidate, _criterion(requirement))
@@ -219,8 +222,8 @@ def test_company_and_duration_use_same_experience() -> None:
         minimum_duration_evidence="3 years",
     )
     candidate = _candidate(
-        _experience(company="Example Corp", end_date=date(2022, 1, 1)),
-        _experience(company="Other Corp", end_date=date(2024, 1, 1)),
+        _experience(company="Example Corp", end_date=YearMonth("2022-01")),
+        _experience(company="Other Corp", end_date=YearMonth("2024-01")),
     )
 
     result = ExperienceCandidateCriterionMatcher().match(candidate, _criterion(requirement))
@@ -311,7 +314,7 @@ def test_dates_activities_and_achievements_do_not_affect_matching() -> None:
     result = ExperienceCandidateCriterionMatcher().match(
         _candidate(
             _experience(
-                start_date=date(2025, 1, 1),
+                start_date=YearMonth("2025-01"),
                 end_date=None,
                 activities=(Activity("Different role text"),),
                 achievements=(Achievement("Different company text"),),

@@ -1,4 +1,4 @@
-from datetime import date
+
 from typing import get_type_hints
 
 import pytest
@@ -19,6 +19,7 @@ from resume_ai.modules.candidate.domain.entities import (
     Technology,
     Tool,
 )
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 from resume_ai.modules.jobs.domain.entities import (
     CriterionCategory,
     CriterionImportance,
@@ -186,7 +187,7 @@ def test_experience_text_is_not_consulted() -> None:
             Experience(
                 company="Example Systems",
                 role="Backend Developer",
-                start_date=date(2024, 1, 1),
+                start_date=YearMonth("2024-01"),
                 activities=(Activity("Developed APIs using Python and FastAPI"),),
             ),
         ),

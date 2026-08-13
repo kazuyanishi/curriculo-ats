@@ -20,6 +20,7 @@ from resume_ai.modules.candidate.domain.entities import (
     Skill,
     Technology,
     Tool,
+    YearMonth,
 )
 
 
@@ -54,6 +55,23 @@ def _parse_optional_date_input(value: object) -> date | None:
     if value is None:
         return None
     return _parse_date_input(value)
+
+
+def _parse_year_month_input(value: object) -> YearMonth:
+    if isinstance(value, YearMonth):
+        return value
+    if not isinstance(value, str):
+        raise ValueError("date must use YYYY-MM format")
+    try:
+        return YearMonth(value)
+    except Exception as error:
+        raise ValueError("date must use YYYY-MM format") from error
+
+
+def _parse_optional_year_month_input(value: object) -> YearMonth | None:
+    if value is None:
+        return None
+    return _parse_year_month_input(value)
 
 
 def _reject_language_level_for_proficiency(value: object) -> object:
@@ -157,15 +175,15 @@ class AchievementInput(_InputSchema):
 class ExperienceInput(_InputSchema):
     company: str
     role: str
-    start_date: date
-    end_date: date | None = None
+    start_date: YearMonth
+    end_date: YearMonth | None = None
     activities: tuple[ActivityInput, ...] = ()
     achievements: tuple[AchievementInput, ...] = ()
 
     _validate_company = field_validator("company")(_require_non_blank)
     _validate_role = field_validator("role")(_require_non_blank)
-    _parse_start_date = field_validator("start_date", mode="before")(_parse_date_input)
-    _parse_end_date = field_validator("end_date", mode="before")(_parse_optional_date_input)
+    _parse_start_date = field_validator("start_date", mode="before")(_parse_year_month_input)
+    _parse_end_date = field_validator("end_date", mode="before")(_parse_optional_year_month_input)
 
     @model_validator(mode="after")
     def _validate_date_order(self) -> "ExperienceInput":
@@ -188,13 +206,17 @@ class EducationInput(_InputSchema):
     institution: str
     course: str
     status: EducationStatus
-    start_date: date | None = None
-    end_date: date | None = None
+    start_date: YearMonth | None = None
+    end_date: YearMonth | None = None
 
     _validate_institution = field_validator("institution")(_require_non_blank)
     _validate_course = field_validator("course")(_require_non_blank)
-    _parse_start_date = field_validator("start_date", mode="before")(_parse_optional_date_input)
-    _parse_end_date = field_validator("end_date", mode="before")(_parse_optional_date_input)
+    _parse_start_date = field_validator("start_date", mode="before")(
+        _parse_optional_year_month_input
+    )
+    _parse_end_date = field_validator("end_date", mode="before")(
+        _parse_optional_year_month_input
+    )
 
     @model_validator(mode="after")
     def _validate_date_order(self) -> "EducationInput":
@@ -315,18 +337,18 @@ class CertificationInput(_InputSchema):
 class ProjectInput(_InputSchema):
     name: str
     description: str
-    start_date: date | None = None
-    end_date: date | None = None
+    start_date: YearMonth | None = None
+    end_date: YearMonth | None = None
     technologies: tuple[str, ...] = ()
     url: str | None = None
 
     _validate_name = field_validator("name")(_require_non_blank)
     _validate_description = field_validator("description")(_require_non_blank)
     _parse_start_date = field_validator("start_date", mode="before")(
-        _parse_optional_date_input
+        _parse_optional_year_month_input
     )
     _parse_end_date = field_validator("end_date", mode="before")(
-        _parse_optional_date_input
+        _parse_optional_year_month_input
     )
     _validate_technologies = field_validator("technologies")(
         _validate_non_blank_string_tuple

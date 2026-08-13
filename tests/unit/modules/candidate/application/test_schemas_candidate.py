@@ -1,4 +1,3 @@
-from datetime import date
 
 import pytest
 from pydantic import BaseModel, ValidationError
@@ -27,6 +26,7 @@ from resume_ai.modules.candidate.domain.entities import (
     Technology,
     Tool,
 )
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 
 
 def _minimum_data() -> dict[str, object]:
@@ -76,7 +76,7 @@ def test_candidate_input_converts_complete_resume_to_domain() -> None:
                 {
                     "company": "Example Systems",
                     "role": "Support Analyst",
-                    "start_date": "2024-01-01",
+                    "start_date": "2024-01",
                     "activities": [{"description": "Provided support"}],
                     "achievements": [{"description": "Improved response time"}],
                 }
@@ -86,8 +86,8 @@ def test_candidate_input_converts_complete_resume_to_domain() -> None:
                     "institution": "Example University",
                     "course": "Computer Science",
                     "status": "completed",
-                    "start_date": "2020-01-01",
-                    "end_date": "2024-01-01",
+                    "start_date": "2020-01",
+                    "end_date": "2024-01",
                 }
             ],
             "skills": [{"name": "Communication", "level": "advanced"}],
@@ -105,7 +105,7 @@ def test_candidate_input_converts_complete_resume_to_domain() -> None:
                 {
                     "name": "Example Project",
                     "description": "Example description",
-                    "start_date": "2024-02-01",
+                    "start_date": "2024-02",
                     "technologies": ["Python", "FastAPI"],
                 }
             ],
@@ -128,7 +128,7 @@ def test_candidate_input_converts_complete_resume_to_domain() -> None:
     assert isinstance(candidate.languages[0], Language)
     assert isinstance(candidate.certifications[0], Certification)
     assert isinstance(candidate.projects[0], Project)
-    assert candidate.experiences[0].start_date == date(2024, 1, 1)
+    assert candidate.experiences[0].start_date == YearMonth("2024-01")
     assert candidate.education[0].status is EducationStatus.COMPLETED
     assert candidate.technologies[0].level is ProficiencyLevel.ADVANCED
     assert candidate.languages[0].level is LanguageLevel.FLUENT
@@ -141,7 +141,7 @@ def test_candidate_input_external_lists_become_tuples() -> None:
     data.update(
         {
             "experiences": [
-                {"company": "Example", "role": "Analyst", "start_date": "2024-01-01"}
+                {"company": "Example", "role": "Analyst", "start_date": "2024-01"}
             ],
             "education": [
                 {"institution": "University", "course": "Course", "status": "completed"}

@@ -3,6 +3,7 @@ from datetime import date
 from enum import StrEnum
 
 from resume_ai.core.exceptions import DomainError
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 
 
 def _require_non_empty(field_name: str, value: str) -> None:
@@ -88,8 +89,8 @@ class Experience:
 
     company: str
     role: str
-    start_date: date
-    end_date: date | None = None
+    start_date: YearMonth
+    end_date: YearMonth | None = None
     activities: tuple[Activity, ...] = ()
     achievements: tuple[Achievement, ...] = ()
 
@@ -97,10 +98,10 @@ class Experience:
         _require_non_empty("company", self.company)
         _require_non_empty("role", self.role)
 
-        if not isinstance(self.start_date, date):
-            raise DomainError("start_date must be a date")
-        if self.end_date is not None and not isinstance(self.end_date, date):
-            raise DomainError("end_date must be a date or None")
+        if not isinstance(self.start_date, YearMonth):
+            raise DomainError("start_date must be a YearMonth")
+        if self.end_date is not None and not isinstance(self.end_date, YearMonth):
+            raise DomainError("end_date must be a YearMonth or None")
         if self.end_date is not None and self.end_date < self.start_date:
             raise DomainError("end_date cannot be before start_date")
 
@@ -130,8 +131,8 @@ class Education:
     institution: str
     course: str
     status: EducationStatus
-    start_date: date | None = None
-    end_date: date | None = None
+    start_date: YearMonth | None = None
+    end_date: YearMonth | None = None
 
     def __post_init__(self) -> None:
         _require_non_empty("institution", self.institution)
@@ -139,10 +140,10 @@ class Education:
 
         if not isinstance(self.status, EducationStatus):
             raise DomainError("status must be an EducationStatus")
-        if self.start_date is not None and not isinstance(self.start_date, date):
-            raise DomainError("start_date must be a date or None")
-        if self.end_date is not None and not isinstance(self.end_date, date):
-            raise DomainError("end_date must be a date or None")
+        if self.start_date is not None and not isinstance(self.start_date, YearMonth):
+            raise DomainError("start_date must be a YearMonth or None")
+        if self.end_date is not None and not isinstance(self.end_date, YearMonth):
+            raise DomainError("end_date must be a YearMonth or None")
         if (
             self.start_date is not None
             and self.end_date is not None
@@ -268,8 +269,8 @@ class Project:
 
     name: str
     description: str
-    start_date: date | None = None
-    end_date: date | None = None
+    start_date: YearMonth | None = None
+    end_date: YearMonth | None = None
     technologies: tuple[str, ...] = ()
     url: str | None = None
 
@@ -281,10 +282,10 @@ class Project:
         _require_non_empty("name", self.name)
         _require_non_empty("description", self.description)
 
-        if self.start_date is not None and not isinstance(self.start_date, date):
-            raise DomainError("start_date must be a date or None")
-        if self.end_date is not None and not isinstance(self.end_date, date):
-            raise DomainError("end_date must be a date or None")
+        if self.start_date is not None and not isinstance(self.start_date, YearMonth):
+            raise DomainError("start_date must be a YearMonth or None")
+        if self.end_date is not None and not isinstance(self.end_date, YearMonth):
+            raise DomainError("end_date must be a YearMonth or None")
         if (
             self.start_date is not None
             and self.end_date is not None

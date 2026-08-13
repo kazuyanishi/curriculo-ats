@@ -1,5 +1,4 @@
 import inspect
-from datetime import date
 from typing import get_type_hints
 
 from resume_ai.bootstrap import (
@@ -17,6 +16,7 @@ from resume_ai.modules.candidate.domain.entities import (
     Technology,
     Tool,
 )
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 from resume_ai.modules.jobs.domain.entities import (
     CriterionCategory,
     CriterionImportance,
@@ -218,8 +218,8 @@ def test_match_and_score_builder_matches_closed_experience_duration() -> None:
         Experience(
             company="Example Corp",
             role="Backend Developer",
-            start_date=date(2020, 1, 1),
-            end_date=date(2023, 1, 1),
+            start_date=YearMonth("2020-01"),
+            end_date=YearMonth("2023-01"),
         )
     )
 
@@ -252,7 +252,7 @@ def test_match_and_score_builder_keeps_open_experience_unsupported() -> None:
         Experience(
             company="Example Corp",
             role="Backend Developer",
-            start_date=date(2020, 1, 1),
+            start_date=YearMonth("2020-01"),
         )
     )
 
@@ -298,13 +298,13 @@ def test_match_and_score_builder_preserves_mixed_experience_pipeline_order() -> 
         Experience(
             company="Example Corp",
             role="Backend Developer",
-            start_date=date(2020, 1, 1),
-            end_date=date(2023, 1, 1),
+            start_date=YearMonth("2020-01"),
+            end_date=YearMonth("2023-01"),
         ),
         Experience(
             company="Example Corp",
             role="Support Analyst",
-            start_date=date(2020, 1, 1),
+            start_date=YearMonth("2020-01"),
         ),
     )
     criteria = JobCriteria(criteria=(supported, missing_technology, unsupported))

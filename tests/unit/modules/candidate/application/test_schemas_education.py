@@ -1,10 +1,10 @@
-from datetime import date
 
 import pytest
 from pydantic import ValidationError
 
 from resume_ai.modules.candidate.application.schemas import EducationInput
 from resume_ai.modules.candidate.domain.entities import Education, EducationStatus
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 
 
 @pytest.mark.parametrize("status", ["in_progress", "completed", "interrupted"])
@@ -39,15 +39,15 @@ def test_education_accepts_string_dates_and_converts_to_domain() -> None:
         institution="Example University",
         course="Computer Science",
         status="completed",
-        start_date="2020-01-01",
-        end_date="2024-01-01",
+        start_date="2020-01",
+        end_date="2024-01",
     )
     domain = schema.to_domain()
 
     assert isinstance(domain, Education)
     assert domain.status is EducationStatus.COMPLETED
-    assert domain.start_date == date(2020, 1, 1)
-    assert domain.end_date == date(2024, 1, 1)
+    assert domain.start_date == YearMonth("2020-01")
+    assert domain.end_date == YearMonth("2024-01")
 
 
 def test_education_allows_missing_dates_and_completed_without_end() -> None:
@@ -66,10 +66,10 @@ def test_education_allows_in_progress_with_end_date() -> None:
         institution="Example University",
         course="Computer Science",
         status="in_progress",
-        end_date="2026-01-01",
+        end_date="2026-01",
     )
 
-    assert schema.end_date == date(2026, 1, 1)
+    assert schema.end_date == YearMonth("2026-01")
 
 
 @pytest.mark.parametrize("field", ["institution", "course"])
@@ -92,8 +92,8 @@ def test_education_rejects_end_date_before_start_date() -> None:
             institution="Example University",
             course="Computer Science",
             status="completed",
-            start_date="2024-01-01",
-            end_date="2023-12-31",
+            start_date="2024-01",
+            end_date="2023-12",
         )
 
 
@@ -102,8 +102,8 @@ def test_education_allows_same_date() -> None:
         institution="Example University",
         course="Computer Science",
         status="completed",
-        start_date="2024-01-01",
-        end_date="2024-01-01",
+        start_date="2024-01",
+        end_date="2024-01",
     )
 
     assert schema.start_date == schema.end_date

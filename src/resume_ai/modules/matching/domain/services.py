@@ -1,6 +1,5 @@
-from datetime import date
-
 from resume_ai.modules.candidate.domain.entities import Candidate
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 from resume_ai.modules.jobs.domain.entities import CriterionCategory, JobCriterion
 from resume_ai.modules.matching.domain.entities import (
     CriterionMatch,
@@ -15,12 +14,9 @@ def _normalize_name(value: str) -> str:
     return value.strip().casefold()
 
 
-def complete_calendar_months(start_date: date, end_date: date) -> int:
+def complete_calendar_months(start_date: YearMonth, end_date: YearMonth) -> int:
     months = (end_date.year - start_date.year) * 12
     months += end_date.month - start_date.month
-
-    if end_date.day < start_date.day:
-        months -= 1
 
     return months
 
