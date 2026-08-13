@@ -29,7 +29,7 @@ function isExperience(value: unknown): boolean {
 }
 
 function isEducation(value: unknown): boolean {
-  return isObject(value) && hasStrings(value, ["institution", "course"]) && ["in_progress", "completed", "interrupted"].includes(String(value.status)) && isNullableString(value.start_date) && isNullableString(value.end_date);
+  return isObject(value) && hasStrings(value, ["institution", "course"]) && ["", "in_progress", "completed", "interrupted"].includes(String(value.status)) && isNullableString(value.start_date) && isNullableString(value.end_date);
 }
 
 function isNamedItem(value: unknown): boolean {
