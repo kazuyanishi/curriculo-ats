@@ -26,7 +26,7 @@ export function CandidateForm({ candidate, setCandidate, onClear }: { candidate:
   const updateExperienceList = (index: number, field: "activities" | "achievements", values: { description: string }[]) => setCandidate({ ...candidate, experiences: candidate.experiences.map((item, i) => i === index ? { ...item, [field]: values } : item) });
 
   const addExperience = () => setCandidate({ ...candidate, experiences: [...candidate.experiences, { company: "", role: "", start_date: "", end_date: null, activities: [], achievements: [] }] });
-  const addEducation = () => setCandidate({ ...candidate, education: [...candidate.education, { institution: "", course: "", status: "completed", start_date: null, end_date: null }] });
+  const addEducation = () => setCandidate({ ...candidate, education: [...candidate.education, { institution: "", course: "", status: "", start_date: null, end_date: null }] });
   const addNamed = (key: "skills" | "technologies" | "tools") => setCandidate({ ...candidate, [key]: [...candidate[key], { name: "", level: null }] });
   const addLanguage = () => setCandidate({ ...candidate, languages: [...candidate.languages, { name: "", level: null }] });
   const addCertification = () => setCandidate({ ...candidate, certifications: [...candidate.certifications, { name: "", issuer: "", issue_date: null, expiration_date: null, credential_id: null, credential_url: null }] });

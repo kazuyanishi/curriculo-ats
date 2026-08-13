@@ -1,6 +1,7 @@
 export type ProficiencyLevel = "basic" | "intermediate" | "advanced" | "expert";
 export type LanguageLevel = "basic" | "intermediate" | "advanced" | "fluent" | "native";
 export type EducationStatus = "in_progress" | "completed" | "interrupted";
+export type EditableEducationStatus = EducationStatus | "";
 
 export type PersonalInfo = { full_name: string; city: string; state: string; country: string };
 export type ContactInfo = { email: string; phone: string };
@@ -11,7 +12,7 @@ export type Experience = {
   company: string; role: string; start_date: string; end_date: string | null;
   activities: Activity[]; achievements: Achievement[];
 };
-export type Education = { institution: string; course: string; status: EducationStatus; start_date: string | null; end_date: string | null };
+export type Education = { institution: string; course: string; status: EditableEducationStatus; start_date: string | null; end_date: string | null };
 export type NamedItem = { name: string; level: ProficiencyLevel | null };
 export type Language = { name: string; level: LanguageLevel | null };
 export type Certification = {
