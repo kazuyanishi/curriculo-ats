@@ -9,6 +9,7 @@ import { JobForm } from "../components/JobForm";
 import { AppHeader, StepIndicator } from "../components/ui";
 import { analyzeCandidate, importCandidateResume } from "../lib/api";
 import { candidateFromImportDraft } from "../lib/candidateImport";
+import { CandidateValidationIssue, validateCandidateForAnalysis } from "../lib/candidateValidation";
 import {
   clearStoredCandidateImportReview,
   loadStoredCandidateImportReview,
@@ -50,6 +51,7 @@ export default function Home() {
   const [analysis, setAnalysis] = useState<AnalyzeResponse | null>(null);
   const [analysisState, setAnalysisState] = useState<AnalysisState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [validationIssues, setValidationIssues] = useState<CandidateValidationIssue[]>([]);
   const [importState, setImportState] = useState<ImportState>("idle");
   const [importError, setImportError] = useState("");
   const [importIssues, setImportIssues] = useState<CandidateImportIssue[]>([]);
@@ -92,6 +94,7 @@ export default function Home() {
     setAnalysis(null);
     setAnalysisState("idle");
     setErrorMessage("");
+    setValidationIssues([]);
     setImportState("idle");
     setImportError("");
     setImportIssues([]);
@@ -106,16 +109,16 @@ export default function Home() {
       return;
     }
     setErrorMessage("");
-    if (!candidate.personal_info.full_name.trim() || !candidate.personal_info.city.trim() || !candidate.personal_info.state.trim() || !candidate.personal_info.country.trim() || !candidate.contact_info.email.trim() || !candidate.contact_info.phone.trim() || !job.description.trim()) {
-      setAnalysisState("error"); setErrorMessage("Revise os campos obrigatórios ou inválidos."); return;
-    }
+    const issues = validateCandidateForAnalysis(candidate, job);
+    if (issues.length > 0) { setValidationIssues(issues); setAnalysisState("error"); return; }
+    setValidationIssues([]);
     analysisInFlightRef.current = true;
     setAnalysisState("loading");
     try {
       const result = await analyzeCandidate(candidate, job);
       setAnalysis(result); setAnalysisState("success");
       requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
-    } catch (error) { setAnalysisState("error"); setErrorMessage(error instanceof Error ? error.message : "Não foi possível concluir a análise."); }
+    } catch (error) { setValidationIssues([]); setAnalysisState("error"); setErrorMessage(error instanceof Error ? error.message : "Não foi possível concluir a análise."); }
     finally { analysisInFlightRef.current = false; }
   };
 
@@ -131,12 +134,12 @@ export default function Home() {
       setImportIssues(editResult.issues);
       setImportReviewPaths(editResult.review_paths);
       setImportState("success");
-      setAnalysis(null); setAnalysisState("idle"); setErrorMessage("");
+      setAnalysis(null); setAnalysisState("idle"); setErrorMessage(""); setValidationIssues([]);
     } catch (error) {
       setImportState("error"); setImportError(importErrorMessage(error));
     } finally { importInFlightRef.current = false; }
   };
 
   const warningsPending = importIssues.length > 0 || importReviewPaths.length > 0;
-  return <><AppHeader /><main className="mx-auto max-w-[1400px] px-5 pb-16 pt-10 lg:px-10"><div className="mb-10 max-w-3xl"><StepIndicator step={analysisState === "success" ? 3 : 1} /><p className="mt-8 text-sm font-bold uppercase tracking-[0.18em] text-indigo-600">Seu próximo passo profissional</p><h1 className="mt-3 text-4xl font-black tracking-tight text-ink sm:text-6xl">Currículo alinhado à vaga,<br /><span className="text-indigo-600">sem inventar experiência.</span></h1><p className="mt-5 max-w-2xl text-lg leading-8 text-slate-500">Compare seu currículo com uma vaga, identifique lacunas e gere uma versão otimizada para sistemas ATS.</p></div><div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.8fr)_minmax(320px,1fr)]"><div className="space-y-4"><CandidateImportPanel loading={importState === "loading"} disabled={!candidateHydrated || !importReviewHydrated || analysisState === "loading"} success={importState === "success"} errorMessage={importError} issues={importIssues} reviewPaths={importReviewPaths} onFileSelected={handleImport} onAcknowledgeReview={() => { setImportIssues([]); setImportReviewPaths([]); }} /><CandidateForm candidate={candidate} setCandidate={setCandidate} onClear={clearCandidate} /></div><div><JobForm job={job} setJob={setJob} onAnalyze={submit} loading={analysisState === "loading"} disabled={!candidateHydrated || !importReviewHydrated || importState === "loading" || warningsPending} />{analysisState === "error" && <div role="alert" className="mt-3 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-800"><p className="font-bold">Não foi possível analisar os dados.</p><p className="mt-1">{errorMessage}</p></div>}</div></div><div ref={resultRef}>{analysis ? <AnalysisResult analysis={analysis} /> : <EmptyAnalysisState />}</div></main></>;
+  return <><AppHeader /><main className="mx-auto max-w-[1400px] px-5 pb-16 pt-10 lg:px-10"><div className="mb-10 max-w-3xl"><StepIndicator step={analysisState === "success" ? 3 : 1} /><p className="mt-8 text-sm font-bold uppercase tracking-[0.18em] text-indigo-600">Seu próximo passo profissional</p><h1 className="mt-3 text-4xl font-black tracking-tight text-ink sm:text-6xl">Currículo alinhado à vaga,<br /><span className="text-indigo-600">sem inventar experiência.</span></h1><p className="mt-5 max-w-2xl text-lg leading-8 text-slate-500">Compare seu currículo com uma vaga, identifique lacunas e gere uma versão otimizada para sistemas ATS.</p></div><div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.8fr)_minmax(320px,1fr)]"><div className="space-y-4"><CandidateImportPanel loading={importState === "loading"} disabled={!candidateHydrated || !importReviewHydrated || analysisState === "loading"} success={importState === "success"} errorMessage={importError} issues={importIssues} reviewPaths={importReviewPaths} onFileSelected={handleImport} onAcknowledgeReview={() => { setImportIssues([]); setImportReviewPaths([]); }} /><CandidateForm candidate={candidate} setCandidate={setCandidate} onClear={clearCandidate} /></div><div><JobForm job={job} setJob={setJob} onAnalyze={submit} loading={analysisState === "loading"} disabled={!candidateHydrated || !importReviewHydrated || importState === "loading" || warningsPending} />{analysisState === "error" && <div role="alert" className="mt-3 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-800"><p className="font-bold">{validationIssues.length > 0 ? "Não foi possível analisar. Corrija os campos abaixo:" : "Não foi possível analisar os dados."}</p>{validationIssues.length > 0 ? <ul className="mt-2 list-disc space-y-1 pl-5">{validationIssues.map(issue => <li key={issue.path}>{issue.message}</li>)}</ul> : <p className="mt-1">{errorMessage}</p>}</div>}</div></div><div ref={resultRef}>{analysis ? <AnalysisResult analysis={analysis} /> : <EmptyAnalysisState />}</div></main></>;
 }
