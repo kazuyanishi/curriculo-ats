@@ -34,6 +34,41 @@ export type MatchingScoreResponse = { score: number | null; coverage: number | n
 export type GapAnalysisResponse = { gaps: CriterionMatchResponse[]; unsupported: CriterionMatchResponse[] };
 export type AnalyzeResponse = { criteria: JobCriterionResponse[]; matching: CriterionMatchResponse[]; score: MatchingScoreResponse; gaps: GapAnalysisResponse; optimized_candidate: Candidate };
 
+export type CandidateImportIssueCode =
+  | "missing_required_field"
+  | "unsupported_date_format"
+  | "unsupported_education_status"
+  | "unsupported_proficiency_level"
+  | "unsupported_language_level";
+export type CandidateImportIssue = { path: string; code: CandidateImportIssueCode; raw_value: string | null };
+export type PersonalInfoDraft = { full_name: string | null; city: string | null; state: string | null; country: string | null };
+export type ContactInfoDraft = { email: string | null; phone: string | null };
+export type ProfessionalLinksDraft = { linkedin: string | null; github: string | null; portfolio: string | null };
+export type ExperienceDraft = {
+  company: string | null; role: string | null; start_date: string | null; end_date: string | null;
+  activities: string[]; achievements: string[];
+};
+export type EducationDraft = {
+  institution: string | null; course: string | null; status: EducationStatus | null;
+  start_date: string | null; end_date: string | null;
+};
+export type NamedItemDraft = { name: string; level: ProficiencyLevel | null };
+export type LanguageDraft = { name: string; level: LanguageLevel | null };
+export type CertificationDraft = {
+  name: string | null; issuer: string | null; issue_date: string | null; expiration_date: string | null;
+  credential_id: string | null; credential_url: string | null;
+};
+export type ProjectDraft = {
+  name: string | null; description: string | null; start_date: string | null; end_date: string | null;
+  technologies: string[]; url: string | null;
+};
+export type CandidateImportDraft = {
+  personal_info: PersonalInfoDraft; contact_info: ContactInfoDraft; professional_links: ProfessionalLinksDraft;
+  experiences: ExperienceDraft[]; education: EducationDraft[]; skills: NamedItemDraft[];
+  technologies: NamedItemDraft[]; tools: NamedItemDraft[]; languages: LanguageDraft[];
+  certifications: CertificationDraft[]; projects: ProjectDraft[]; issues: CandidateImportIssue[];
+};
+
 export type NormalizedCandidate = Omit<Candidate, "personal_info" | "contact_info" | "professional_links" | "experiences" | "education" | "skills" | "technologies" | "tools" | "languages" | "certifications" | "projects"> & {
   personal_info: PersonalInfo;
   contact_info: ContactInfo;
