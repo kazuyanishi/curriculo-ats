@@ -31,7 +31,18 @@ function isLegacyCandidate(value: unknown): value is Candidate {
   return isObject(value.personal_info) && isObject(value.contact_info) && isObject(value.professional_links)
     && collections.every(name => Array.isArray(value[name]) && value[name].every(isObject));
 }
-function toMonth(value: unknown): unknown { return isString(value) && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.slice(0, 7) : value; }
+function isValidIsoDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (year < 1 || month < 1 || month > 12 || day < 1) return false;
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+  return day <= daysInMonth;
+}
+function toMonth(value: unknown): unknown { return isString(value) && /^\d{4}-\d{2}-\d{2}$/.test(value) && isValidIsoDate(value) ? value.slice(0, 7) : value; }
 function migrateCandidate(candidate: Candidate): Candidate {
   return { ...candidate, experiences: candidate.experiences.map(item => ({ ...item, start_date: String(toMonth(item.start_date)), end_date: item.end_date === null ? null : String(toMonth(item.end_date)) })), education: candidate.education.map(item => ({ ...item, start_date: item.start_date === null ? null : String(toMonth(item.start_date)), end_date: item.end_date === null ? null : String(toMonth(item.end_date)) })), projects: candidate.projects.map(item => ({ ...item, start_date: item.start_date === null ? null : String(toMonth(item.start_date)), end_date: item.end_date === null ? null : String(toMonth(item.end_date)) })) };
 }
