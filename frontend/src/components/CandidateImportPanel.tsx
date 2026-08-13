@@ -34,7 +34,7 @@ function pathLabel(path: string): string {
   }
   const [, collection, index, field] = match;
   const names: Record<string, string> = { experiences: "Experiência", education: "Formação", skills: "Competência", technologies: "Tecnologia", tools: "Ferramenta", languages: "Idioma", certifications: "Certificação", projects: "Projeto" };
-  const fields: Record<string, string> = { company: "Empresa", role: "Cargo", start_date: "Início", end_date: "Fim", institution: "Instituição", course: "Curso", status: "Status", level: "Nível", issuer: "Emissor", name: "Nome", description: "Descrição" };
+  const fields: Record<string, string> = { company: "Empresa", role: "Cargo", start_date: "Início", end_date: "Fim", institution: "Instituição", course: "Curso", status: "Status", level: "Nível", issuer: "Emissor", issue_date: "Data de emissão", expiration_date: "Validade", name: "Nome", description: "Descrição" };
   return `${names[collection] ?? collection} ${Number(index) + 1} · ${fields[field] ?? field}`;
 }
 
