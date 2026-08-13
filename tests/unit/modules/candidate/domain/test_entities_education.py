@@ -1,10 +1,10 @@
 from dataclasses import FrozenInstanceError
-from datetime import date
 
 import pytest
 
 from resume_ai.core.exceptions import DomainError
 from resume_ai.modules.candidate.domain.entities import Education, EducationStatus
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 
 
 def test_education_status_values_are_stable() -> None:
@@ -25,8 +25,8 @@ def test_education_accepts_minimum_data() -> None:
 
 
 def test_education_accepts_complete_data() -> None:
-    start = date(2020, 1, 1)
-    end = date(2024, 1, 1)
+    start = YearMonth("2020-01")
+    end = YearMonth("2024-01")
     education = Education(
         institution="Example University",
         course="Computer Science",
@@ -71,7 +71,7 @@ def test_education_rejects_string_dates(field: str) -> None:
         field: "2024-01",
     }
 
-    with pytest.raises(DomainError, match=f"{field} must be a date or None"):
+    with pytest.raises(DomainError, match=f"{field} must be a YearMonth or None"):
         Education(**values)
 
 
@@ -81,13 +81,13 @@ def test_education_rejects_end_date_before_start_date() -> None:
             "Example University",
             "Computer Science",
             EducationStatus.INTERRUPTED,
-            date(2024, 1, 1),
-            date(2023, 1, 1),
+            YearMonth("2024-01"),
+            YearMonth("2023-01"),
         )
 
 
 def test_education_accepts_same_date_and_missing_dates() -> None:
-    same_date = date(2024, 1, 1)
+    same_date = YearMonth("2024-01")
 
     completed = Education(
         "Example University", "Computer Science", EducationStatus.COMPLETED

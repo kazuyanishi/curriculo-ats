@@ -6,7 +6,7 @@ from resume_ai.modules.candidate.domain.entities import Candidate, Experience
 
 
 def _date(value: object) -> str:
-    return value.strftime("%Y-%m")
+    return str(value) if not hasattr(value, "strftime") else value.strftime("%Y-%m")
 
 
 def _add_collection(document: Document, title: str, items: tuple[object, ...]) -> None:

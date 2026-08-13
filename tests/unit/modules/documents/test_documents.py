@@ -1,4 +1,4 @@
-from datetime import date
+
 from io import BytesIO
 from typing import get_type_hints
 
@@ -24,6 +24,7 @@ from resume_ai.modules.candidate.domain.entities import (
     Technology,
     Tool,
 )
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 from resume_ai.modules.documents.application.services import (
     GenerateCandidateDocuments,
     GeneratedCandidateDocuments,
@@ -47,7 +48,7 @@ def _candidate(*, complete: bool = True) -> Candidate:
             Experience(
                 "Example Corp",
                 "Backend Developer",
-                date(2020, 1, 1),
+                YearMonth("2020-01"),
                 activities=(Activity("Developed APIs"),),
                 achievements=(Achievement("Improved reliability"),),
             ),

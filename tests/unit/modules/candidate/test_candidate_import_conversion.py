@@ -156,6 +156,22 @@ def test_valid_leap_day_is_preserved() -> None:
     assert not any(issue.path == "experiences[0].start_date" for issue in draft.issues)
 
 
+def test_certification_dates_keep_full_day_precision() -> None:
+    extraction = CandidateResumeExtraction(
+        certifications=(
+            ExtractedCertification(
+                name=evidence("Certification"),
+                issuer=evidence("Institute"),
+                issue_date=evidence("2025-03-17"),
+            ),
+        )
+    )
+
+    draft = CandidateResumeDraftConverter().convert(extraction)
+
+    assert draft.certifications[0].issue_date == "2025-03-17"
+
+
 @pytest.mark.parametrize("value", ["Atual", "ATUAL", "Present", "present", "Current"])
 def test_current_markers_are_supported_only_for_experience_end_date(value: str) -> None:
     extraction = CandidateResumeExtraction(

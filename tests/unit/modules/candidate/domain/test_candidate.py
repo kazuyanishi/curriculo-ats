@@ -1,5 +1,4 @@
 from dataclasses import FrozenInstanceError
-from datetime import date
 
 import pytest
 
@@ -21,6 +20,7 @@ from resume_ai.modules.candidate.domain.entities import (
     Technology,
     Tool,
 )
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 
 
 def _personal_info() -> PersonalInfo:
@@ -32,7 +32,7 @@ def _contact_info() -> ContactInfo:
 
 
 def _candidate_kwargs() -> dict:
-    experience = Experience("Sample Company", "Operations Specialist", date(2024, 1, 1))
+    experience = Experience("Sample Company", "Operations Specialist", YearMonth("2024-01"))
     education = Education("Example University", "Computer Science", EducationStatus.COMPLETED)
     skill = Skill("Communication")
     technology = Technology("Python", ProficiencyLevel.ADVANCED)
@@ -145,7 +145,7 @@ def test_candidate_rejects_lists_for_all_collections(field_name: str) -> None:
         ("tools", Technology("Docker")),
         ("languages", Skill("English")),
         ("certifications", Project("Example Project", "Example description.")),
-        ("projects", Experience("Sample Company", "Analyst", date(2024, 1, 1))),
+        ("projects", Experience("Sample Company", "Analyst", YearMonth("2024-01"))),
     ],
 )
 def test_candidate_rejects_invalid_collection_items(field_name: str, invalid_item) -> None:
