@@ -1,4 +1,11 @@
-import { AnalyzeResponse, Candidate, Job, normalizeCandidatePayload, normalizeJobPayload } from "./types";
+import {
+  AnalyzeResponse,
+  Candidate,
+  CandidateImportDraft,
+  Job,
+  normalizeCandidatePayload,
+  normalizeJobPayload,
+} from "./types";
 
 type ApiErrorBody = { detail?: unknown };
 
@@ -35,4 +42,16 @@ export async function downloadDocument(kind: "docx" | "pdf", candidate: Candidat
   const disposition = response.headers.get("Content-Disposition");
   const filename = disposition?.match(/filename="?([^";]+)"?/i)?.[1] ?? null;
   return { blob: await response.blob(), filename };
+}
+
+export async function importCandidateResume(file: File): Promise<CandidateImportDraft> {
+  const formData = new FormData();
+  formData.append("file", file, file.name);
+
+  const response = await fetch("/api/candidate/import", {
+    method: "POST",
+    body: formData,
+  });
+  if (!response.ok) throw await responseError(response);
+  return await response.json() as CandidateImportDraft;
 }
