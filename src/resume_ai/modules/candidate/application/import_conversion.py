@@ -29,6 +29,7 @@ from resume_ai.modules.candidate.domain.entities import (
     LanguageLevel,
     ProficiencyLevel,
 )
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 
 
 def _value(field: ResumeFieldEvidence | None) -> str | None:
@@ -72,10 +73,8 @@ def _try_month(
 
     if len(value) == 7 and value[4] == "-":
         try:
-            month = int(value[5:7])
-            if not 1 <= month <= 12:
-                raise ValueError
-        except ValueError:
+            YearMonth(value)
+        except Exception:
             _issue(issues, path, CandidateImportIssueCode.UNSUPPORTED_DATE_FORMAT, value)
             return None
         return value
@@ -84,6 +83,11 @@ def _try_month(
         try:
             date.fromisoformat(value)
         except ValueError:
+            _issue(issues, path, CandidateImportIssueCode.UNSUPPORTED_DATE_FORMAT, value)
+            return None
+        try:
+            YearMonth(value[:7])
+        except Exception:
             _issue(issues, path, CandidateImportIssueCode.UNSUPPORTED_DATE_FORMAT, value)
             return None
         return value[:7]
@@ -97,7 +101,13 @@ def _try_month(
         except ValueError:
             _issue(issues, path, CandidateImportIssueCode.UNSUPPORTED_DATE_FORMAT, value)
             return None
-        return f"{year:04d}-{month:02d}"
+        normalized = f"{year:04d}-{month:02d}"
+        try:
+            YearMonth(normalized)
+        except Exception:
+            _issue(issues, path, CandidateImportIssueCode.UNSUPPORTED_DATE_FORMAT, value)
+            return None
+        return normalized
 
     if len(value) != 10 or value[4] != "-" or value[7] != "-":
         _issue(issues, path, CandidateImportIssueCode.UNSUPPORTED_DATE_FORMAT, value)

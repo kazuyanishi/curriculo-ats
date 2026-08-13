@@ -104,7 +104,7 @@ def test_valid_iso_date_is_preserved(value: str) -> None:
     assert not any(issue.path == "experiences[0].start_date" for issue in draft.issues)
 
 
-@pytest.mark.parametrize("value", ["13/2024", "2024-13", "2024-02-31"])
+@pytest.mark.parametrize("value", ["13/2024", "2024-13", "2024-02-31", "abcd-10", "0000-10"])
 def test_invalid_month_dates_report_unsupported_format(value: str) -> None:
     extraction = CandidateResumeExtraction(
         experiences=(ExtractedExperience(start_date=evidence(value)),)
