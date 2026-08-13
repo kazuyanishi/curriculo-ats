@@ -70,16 +70,40 @@ def _try_iso_date(
     if allow_current and marker in {"atual", "present", "current"}:
         return None
 
+    if len(value) == 7 and value[4] == "-":
+        try:
+            month = int(value[5:7])
+            if not 1 <= month <= 12:
+                raise ValueError
+        except ValueError:
+            _issue(issues, path, CandidateImportIssueCode.UNSUPPORTED_DATE_FORMAT, value)
+            return None
+        return value
+
+    if len(value) == 10 and value[4] == "-" and value[7] == "-":
+        try:
+            date.fromisoformat(value)
+        except ValueError:
+            _issue(issues, path, CandidateImportIssueCode.UNSUPPORTED_DATE_FORMAT, value)
+            return None
+        return value[:7]
+
+    if len(value) == 7 and value[2] == "/":
+        try:
+            month = int(value[:2])
+            year = int(value[3:])
+            if not 1 <= month <= 12 or year < 1:
+                raise ValueError
+        except ValueError:
+            _issue(issues, path, CandidateImportIssueCode.UNSUPPORTED_DATE_FORMAT, value)
+            return None
+        return f"{year:04d}-{month:02d}"
+
     if len(value) != 10 or value[4] != "-" or value[7] != "-":
         _issue(issues, path, CandidateImportIssueCode.UNSUPPORTED_DATE_FORMAT, value)
         return None
 
-    try:
-        date.fromisoformat(value)
-    except ValueError:
-        _issue(issues, path, CandidateImportIssueCode.UNSUPPORTED_DATE_FORMAT, value)
-        return None
-    return value
+    return value[:7]
 
 
 def _map_closed(
