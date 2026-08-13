@@ -70,6 +70,10 @@ def _try_iso_date(
     if allow_current and marker in {"atual", "present", "current"}:
         return None
 
+    if len(value) != 10 or value[4] != "-" or value[7] != "-":
+        _issue(issues, path, CandidateImportIssueCode.UNSUPPORTED_DATE_FORMAT, value)
+        return None
+
     try:
         date.fromisoformat(value)
     except ValueError:

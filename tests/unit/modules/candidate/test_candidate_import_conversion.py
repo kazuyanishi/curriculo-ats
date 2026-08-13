@@ -104,7 +104,21 @@ def test_valid_iso_date_is_preserved(value: str) -> None:
     assert not any(issue.path == "experiences[0].start_date" for issue in draft.issues)
 
 
-@pytest.mark.parametrize("value", ["2024-02-31", "01/2024", "01/01/2024", "2024"])
+@pytest.mark.parametrize(
+    "value",
+    [
+        "2024-02-31",
+        "20240131",
+        "2021-W01-1",
+        "2024/01/31",
+        "01/31/2024",
+        "31/01/2024",
+        "01/2024",
+        "2024",
+        "2024-1-31",
+        "2024-01-1",
+    ],
+)
 def test_unsupported_dates_are_not_inferred(value: str) -> None:
     extraction = CandidateResumeExtraction(
         experiences=(ExtractedExperience(start_date=evidence(value)),)
@@ -116,6 +130,17 @@ def test_unsupported_dates_are_not_inferred(value: str) -> None:
     issue = next(issue for issue in draft.issues if issue.path == "experiences[0].start_date")
     assert issue.code == CandidateImportIssueCode.UNSUPPORTED_DATE_FORMAT
     assert issue.raw_value == value
+
+
+def test_valid_leap_day_is_preserved() -> None:
+    extraction = CandidateResumeExtraction(
+        experiences=(ExtractedExperience(start_date=evidence("2000-02-29")),)
+    )
+
+    draft = CandidateResumeDraftConverter().convert(extraction)
+
+    assert draft.experiences[0].start_date == "2000-02-29"
+    assert not any(issue.path == "experiences[0].start_date" for issue in draft.issues)
 
 
 @pytest.mark.parametrize("value", ["Atual", "ATUAL", "Present", "present", "Current"])
