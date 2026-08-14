@@ -1,5 +1,5 @@
 import logging
-from dataclasses import asdict, is_dataclass
+from dataclasses import fields, is_dataclass
 from enum import StrEnum
 from typing import Annotated, Any
 
@@ -20,6 +20,7 @@ from resume_ai.modules.candidate.application.exceptions import (
 from resume_ai.modules.candidate.application.import_draft import CandidateImportDraft
 from resume_ai.modules.candidate.application.schemas import CandidateInput
 from resume_ai.modules.candidate.domain.entities import Candidate
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 from resume_ai.modules.candidate.infrastructure.docx_text_extractor import (
     DocxResumeTextExtractor,
 )
@@ -36,10 +37,12 @@ MAX_RESUME_FILE_BYTES = 5 * 1024 * 1024
 
 
 def _json_value(value: Any) -> Any:
+    if isinstance(value, YearMonth):
+        return str(value)
     if isinstance(value, StrEnum):
         return value.value
     if is_dataclass(value):
-        return {key: _json_value(item) for key, item in asdict(value).items()}
+        return {field.name: _json_value(getattr(value, field.name)) for field in fields(value)}
     if isinstance(value, tuple):
         return [_json_value(item) for item in value]
     if isinstance(value, list):

@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from io import BytesIO
 
 import pytest
@@ -6,6 +7,8 @@ from fastapi.testclient import TestClient
 
 from resume_ai.integrations.ai.config import AIConfig
 from resume_ai.interfaces.api.app import create_app
+from resume_ai.interfaces.api.routes import _json_value
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
 
 
 def _candidate_payload() -> dict:
@@ -45,6 +48,61 @@ def test_health_does_not_require_ai(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_json_value_serializes_year_month_before_generic_dataclass() -> None:
+    @dataclass(frozen=True)
+    class Example:
+        month: YearMonth
+
+    assert _json_value(YearMonth("2025-11")) == "2025-11"
+    assert _json_value(Example(YearMonth("2025-11"))) == {"month": "2025-11"}
+
+
+def test_analyze_serializes_year_months_in_optimized_candidate(monkeypatch) -> None:
+    monkeypatch.setattr("resume_ai.bootstrap.OpenAIStructuredAIClient", FakeOpenAIClient)
+    candidate = _candidate_payload()
+    candidate.update(
+        {
+            "experiences": [
+                {
+                    "company": "Example Systems",
+                    "role": "Backend Developer",
+                    "start_date": "2025-11",
+                    "end_date": "2026-01",
+                }
+            ],
+            "education": [
+                {
+                    "institution": "University",
+                    "course": "Computer Science",
+                    "status": "completed",
+                    "start_date": "2024-01",
+                    "end_date": "2025-01",
+                }
+            ],
+            "projects": [
+                {
+                    "name": "Resume App",
+                    "description": "A resume application",
+                    "start_date": "2024-02",
+                    "end_date": "2024-03",
+                }
+            ],
+        }
+    )
+
+    response = TestClient(create_app(AIConfig("key", "model"))).post(
+        "/api/v1/analyze",
+        json={"candidate": candidate, "job": {"description": "Python is required."}},
+    )
+
+    assert response.status_code == 200
+    optimized = response.json()["optimized_candidate"]
+    assert optimized["experiences"][0]["start_date"] == "2025-11"
+    assert optimized["experiences"][0]["end_date"] == "2026-01"
+    assert optimized["education"][0]["start_date"] == "2024-01"
+    assert optimized["projects"][0]["end_date"] == "2024-03"
 
 
 def test_analyze_uses_pipeline_and_returns_structured_response(monkeypatch) -> None:
@@ -122,14 +180,20 @@ def test_analyze_truth_gate_returns_422(monkeypatch) -> None:
 def test_invalid_candidate_and_job_return_422() -> None:
     client = TestClient(create_app())
 
-    assert client.post(
-        "/api/v1/analyze",
-        json={"candidate": {}, "job": {"description": "x"}},
-    ).status_code == 422
-    assert client.post(
-        "/api/v1/analyze",
-        json={"candidate": _candidate_payload(), "job": {"description": ""}},
-    ).status_code == 422
+    assert (
+        client.post(
+            "/api/v1/analyze",
+            json={"candidate": {}, "job": {"description": "x"}},
+        ).status_code
+        == 422
+    )
+    assert (
+        client.post(
+            "/api/v1/analyze",
+            json={"candidate": _candidate_payload(), "job": {"description": ""}},
+        ).status_code
+        == 422
+    )
 
 
 @pytest.mark.parametrize(

@@ -103,7 +103,11 @@ def _validate_email(value: str) -> str:
 
 
 class _InputSchema(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        json_encoders={YearMonth: str},
+    )
 
 
 class PersonalInfoInput(_InputSchema):
