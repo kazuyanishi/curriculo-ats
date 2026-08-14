@@ -1,6 +1,7 @@
 from resume_ai.modules.candidate.domain.entities import Candidate
 from resume_ai.modules.jobs.domain.entities import JobCriteria
 from resume_ai.modules.matching.application.ports import CandidateJobMatcher
+from resume_ai.modules.matching.application.provenance import MatchingProvenanceGate
 from resume_ai.modules.matching.domain.entities import (
     GapAnalysisResult,
     MatchingResult,
@@ -13,15 +14,23 @@ from resume_ai.modules.matching.domain.services import (
 
 
 class MatchCandidateToJob:
-    def __init__(self, matcher: CandidateJobMatcher) -> None:
+    def __init__(
+        self,
+        matcher: CandidateJobMatcher,
+        provenance_gate: MatchingProvenanceGate | None = None,
+    ) -> None:
         self._matcher = matcher
+        self._provenance_gate = provenance_gate
 
     def execute(
         self,
         candidate: Candidate,
         criteria: JobCriteria,
     ) -> MatchingResult:
-        return self._matcher.match(candidate, criteria)
+        result = self._matcher.match(candidate, criteria)
+        if self._provenance_gate is not None:
+            self._provenance_gate.validate(candidate, result)
+        return result
 
 
 class CalculateMatchingScore:

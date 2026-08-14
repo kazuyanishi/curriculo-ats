@@ -26,6 +26,7 @@ from resume_ai.modules.matching.application.matchers import (
     DeterministicCandidateJobMatcher,
     HybridCandidateJobMatcher,
 )
+from resume_ai.modules.matching.application.provenance import MatchingProvenanceGate
 from resume_ai.modules.matching.application.services import (
     AnalyzeMatchingGaps,
     CalculateMatchingScore,
@@ -81,13 +82,16 @@ def build_import_candidate_from_resume_text(
 def build_match_candidate_to_job() -> MatchCandidateToJob:
     criterion_matcher = ExactCandidateCriterionMatcher()
     matcher = DeterministicCandidateJobMatcher(criterion_matcher)
-    return MatchCandidateToJob(matcher)
+    return MatchCandidateToJob(matcher, MatchingProvenanceGate())
 
 
 def build_hybrid_match_candidate_to_job(config: AIConfig) -> MatchCandidateToJob:
     deterministic_matcher = DeterministicCandidateJobMatcher(ExactCandidateCriterionMatcher())
     semantic_refiner = AISemanticMatchingRefiner(OpenAIStructuredAIClient(config))
-    return MatchCandidateToJob(HybridCandidateJobMatcher(deterministic_matcher, semantic_refiner))
+    return MatchCandidateToJob(
+        HybridCandidateJobMatcher(deterministic_matcher, semantic_refiner),
+        MatchingProvenanceGate(),
+    )
 
 
 def build_calculate_matching_score() -> CalculateMatchingScore:

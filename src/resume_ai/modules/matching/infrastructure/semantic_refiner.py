@@ -89,6 +89,11 @@ class AISemanticMatchingRefiner:
             else CriterionMatch(
                 criterion=match.criterion,
                 status=decision_by_index[index].status,
+                candidate_evidence_paths=(
+                    decision_by_index[index].evidence_paths
+                    if decision_by_index[index].status is MatchStatus.MATCHED
+                    else ()
+                ),
             )
             for index, match in enumerate(result.matches)
         )

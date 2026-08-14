@@ -53,13 +53,17 @@ def _json_value(value: Any) -> Any:
 
 
 def _analysis_response(result: CandidateAnalysisResult) -> AnalyzeResponse:
+    def match_response(item: object) -> dict[str, Any]:
+        value = _json_value(item)
+        return {"criterion": value["criterion"], "status": value["status"]}
+
     return AnalyzeResponse(
         criteria=[_json_value(item) for item in result.criteria.criteria],
-        matching=[_json_value(item) for item in result.matching.matches],
+        matching=[match_response(item) for item in result.matching.matches],
         score=_json_value(result.score),
         gaps={
-            "gaps": [_json_value(item) for item in result.gaps.gaps],
-            "unsupported": [_json_value(item) for item in result.gaps.unsupported],
+            "gaps": [match_response(item) for item in result.gaps.gaps],
+            "unsupported": [match_response(item) for item in result.gaps.unsupported],
         },
         optimized_candidate=_json_value(result.optimized_candidate),
     )
