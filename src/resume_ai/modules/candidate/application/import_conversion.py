@@ -1,3 +1,4 @@
+import re
 from datetime import date
 
 from resume_ai.modules.candidate.application.import_draft import (
@@ -135,6 +136,29 @@ def _try_full_date(
     return value
 
 
+def _try_experience_interval(
+    field: ResumeFieldEvidence,
+    start_path: str,
+    end_path: str,
+    issues: list[CandidateImportIssue],
+) -> tuple[str | None, str | None] | None:
+    match = re.fullmatch(
+        r"\s*(\d{2}/\d{4})\s*-\s*(\d{2}/\d{4}|Atual|Present|Current)\s*",
+        field.value,
+        re.IGNORECASE,
+    )
+    if match is None:
+        return None
+
+    interval_start = ResumeFieldEvidence(value=match.group(1), evidence=match.group(1))
+    interval_end = ResumeFieldEvidence(value=match.group(2), evidence=match.group(2))
+    start_date = _try_month(interval_start, start_path, issues)
+    if start_date is None:
+        return None, None
+    end_date = _try_month(interval_end, end_path, issues, allow_current=True)
+    return start_date, end_date
+
+
 def _map_closed(
     field: ResumeFieldEvidence | None,
     path: str,
@@ -204,13 +228,33 @@ def _convert_experience(
     issues: list[CandidateImportIssue],
 ) -> ExperienceDraft:
     prefix = f"experiences[{index}]"
+    interval = (
+        _try_experience_interval(
+            item.start_date,
+            f"{prefix}.start_date",
+            f"{prefix}.end_date",
+            issues,
+        )
+        if item.start_date is not None and item.end_date is None
+        else None
+    )
     return ExperienceDraft(
         company=_required_value(item.company, f"{prefix}.company", issues),
         role=_required_value(item.role, f"{prefix}.role", issues),
-        start_date=_try_month(item.start_date, f"{prefix}.start_date", issues)
-        if item.start_date is not None
-        else _required_value(None, f"{prefix}.start_date", issues),
-        end_date=_try_month(item.end_date, f"{prefix}.end_date", issues, allow_current=True),
+        start_date=(
+            interval[0]
+            if interval is not None
+            else (
+                _try_month(item.start_date, f"{prefix}.start_date", issues)
+                if item.start_date is not None
+                else _required_value(None, f"{prefix}.start_date", issues)
+            )
+        ),
+        end_date=(
+            interval[1]
+            if interval is not None
+            else _try_month(item.end_date, f"{prefix}.end_date", issues, allow_current=True)
+        ),
         activities=tuple(field.value for field in item.activities),
         achievements=tuple(field.value for field in item.achievements),
     )
@@ -281,9 +325,7 @@ def _convert_certification(
         name=_required_value(item.name, f"{prefix}.name", issues),
         issuer=_required_value(item.issuer, f"{prefix}.issuer", issues),
         issue_date=_try_full_date(item.issue_date, f"{prefix}.issue_date", issues),
-        expiration_date=_try_full_date(
-            item.expiration_date, f"{prefix}.expiration_date", issues
-        ),
+        expiration_date=_try_full_date(item.expiration_date, f"{prefix}.expiration_date", issues),
         credential_id=_value(item.credential_id),
         credential_url=_value(item.credential_url),
     )

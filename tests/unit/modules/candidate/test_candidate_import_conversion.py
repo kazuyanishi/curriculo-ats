@@ -46,8 +46,7 @@ def test_empty_extraction_preserves_none_and_reports_required_fields() -> None:
         "contact_info.phone",
     ]
     assert all(
-        issue.code == CandidateImportIssueCode.MISSING_REQUIRED_FIELD
-        for issue in draft.issues
+        issue.code == CandidateImportIssueCode.MISSING_REQUIRED_FIELD for issue in draft.issues
     )
 
 
@@ -102,6 +101,73 @@ def test_valid_iso_date_is_preserved(value: str) -> None:
 
     assert draft.experiences[0].start_date == "2024-01"
     assert not any(issue.path == "experiences[0].start_date" for issue in draft.issues)
+
+
+@pytest.mark.parametrize(
+    ("value", "expected_start", "expected_end"),
+    [
+        ("11/2025 - Atual", "2025-11", None),
+        ("10/2024 - 10/2025", "2024-10", "2025-10"),
+        ("05/2024 - 09/2024", "2024-05", "2024-09"),
+        ("10/2020 - 07/2024", "2020-10", "2024-07"),
+    ],
+)
+def test_experience_month_interval_is_split(
+    value: str, expected_start: str, expected_end: str | None
+) -> None:
+    extraction = CandidateResumeExtraction(
+        experiences=(ExtractedExperience(start_date=evidence(value)),)
+    )
+
+    draft = CandidateResumeDraftConverter().convert(extraction)
+
+    assert draft.experiences[0].start_date == expected_start
+    assert draft.experiences[0].end_date == expected_end
+    assert not any(
+        issue.path == "experiences[0].start_date"
+        and issue.code == CandidateImportIssueCode.UNSUPPORTED_DATE_FORMAT
+        for issue in draft.issues
+    )
+
+
+def test_experience_separate_dates_keep_existing_conversion() -> None:
+    extraction = CandidateResumeExtraction(
+        experiences=(
+            ExtractedExperience(start_date=evidence("10/2024"), end_date=evidence("10/2025")),
+        )
+    )
+
+    draft = CandidateResumeDraftConverter().convert(extraction)
+
+    assert draft.experiences[0].start_date == "2024-10"
+    assert draft.experiences[0].end_date == "2025-10"
+
+
+def test_invalid_experience_interval_is_not_silently_converted() -> None:
+    extraction = CandidateResumeExtraction(
+        experiences=(ExtractedExperience(start_date=evidence("13/2024 - 10/2025")),)
+    )
+
+    draft = CandidateResumeDraftConverter().convert(extraction)
+
+    assert draft.experiences[0].start_date is None
+    assert draft.experiences[0].end_date is None
+    issue = next(issue for issue in draft.issues if issue.path == "experiences[0].start_date")
+    assert issue.code == CandidateImportIssueCode.UNSUPPORTED_DATE_FORMAT
+    assert issue.raw_value == "13/2024"
+
+
+def test_unknown_experience_interval_remains_unsupported() -> None:
+    value = "2024 approximately - 2025"
+    extraction = CandidateResumeExtraction(
+        experiences=(ExtractedExperience(start_date=evidence(value)),)
+    )
+
+    draft = CandidateResumeDraftConverter().convert(extraction)
+
+    issue = next(issue for issue in draft.issues if issue.path == "experiences[0].start_date")
+    assert issue.code == CandidateImportIssueCode.UNSUPPORTED_DATE_FORMAT
+    assert issue.raw_value == value
 
 
 @pytest.mark.parametrize("value", ["13/2024", "2024-13", "2024-02-31", "abcd-10", "0000-10"])
