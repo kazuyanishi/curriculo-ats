@@ -1,6 +1,9 @@
 import pytest
 
-from resume_ai.modules.candidate.application.exceptions import ResumeCandidateGroundingError
+from resume_ai.modules.candidate.application.exceptions import (
+    GroundingReason,
+    ResumeCandidateGroundingError,
+)
 from resume_ai.modules.candidate.application.grounding import CandidateResumeTruthGate
 from resume_ai.modules.candidate.application.import_schemas import (
     CandidateResumeExtraction,
@@ -39,16 +42,23 @@ def test_value_must_be_literal_inside_evidence() -> None:
     extraction = CandidateResumeExtraction(
         technologies=[ExtractedNamedItem(name=field("Kubernetes", "Skills: Python"))]
     )
-    with pytest.raises(ResumeCandidateGroundingError):
+    with pytest.raises(ResumeCandidateGroundingError) as raised:
         CandidateResumeTruthGate().validate("Skills: Python", extraction)
+
+    assert raised.value.path == "technologies[0].name"
+    assert raised.value.reason is GroundingReason.VALUE_NOT_IN_EVIDENCE
+    assert "Kubernetes" not in str(raised.value)
 
 
 def test_evidence_must_be_literal_inside_resume() -> None:
     extraction = CandidateResumeExtraction(
         technologies=[ExtractedNamedItem(name=field("Kubernetes", "Skills: Kubernetes"))]
     )
-    with pytest.raises(ResumeCandidateGroundingError):
+    with pytest.raises(ResumeCandidateGroundingError) as raised:
         CandidateResumeTruthGate().validate("Skills: Python", extraction)
+
+    assert raised.value.path == "technologies[0].name"
+    assert raised.value.reason is GroundingReason.EVIDENCE_NOT_IN_RESUME_TEXT
 
 
 @pytest.mark.parametrize(
@@ -185,3 +195,63 @@ def test_deep_invalid_fact_is_rejected() -> None:
     )
     with pytest.raises(ResumeCandidateGroundingError):
         CandidateResumeTruthGate().validate("Project\nPython", extraction)
+
+
+@pytest.mark.parametrize(
+    ("extraction", "resume_text", "expected_path"),
+    [
+        (
+            CandidateResumeExtraction(
+                personal_info=ExtractedPersonalInfo(full_name=field("Ghost"))
+            ),
+            "Jane Doe",
+            "personal_info.full_name",
+        ),
+        (
+            CandidateResumeExtraction(education=(ExtractedEducation(status=field("Completed")),)),
+            "Computer Science",
+            "education[0].status",
+        ),
+        (
+            CandidateResumeExtraction(
+                languages=(
+                    ExtractedLanguage(name=field("Portuguese")),
+                    ExtractedLanguage(name=field("English"), level=field("Fluent")),
+                )
+            ),
+            "Portuguese\nEnglish",
+            "languages[1].level",
+        ),
+        (
+            CandidateResumeExtraction(
+                projects=(
+                    ExtractedProject(name=field("Project One")),
+                    ExtractedProject(name=field("Project Two"), technologies=(field("Hidden"),)),
+                )
+            ),
+            "Project One\nProject Two",
+            "projects[1].technologies[0]",
+        ),
+        (
+            CandidateResumeExtraction(
+                experiences=(
+                    ExtractedExperience(role=field("Backend Developer")),
+                    ExtractedExperience(
+                        role=field("Frontend Developer"),
+                        activities=(field("Hidden activity"),),
+                    ),
+                )
+            ),
+            "Backend Developer\nFrontend Developer",
+            "experiences[1].activities[0]",
+        ),
+    ],
+)
+def test_grounding_error_reports_nested_field_path(
+    extraction: CandidateResumeExtraction, resume_text: str, expected_path: str
+) -> None:
+    with pytest.raises(ResumeCandidateGroundingError) as raised:
+        CandidateResumeTruthGate().validate(resume_text, extraction)
+
+    assert raised.value.path == expected_path
+    assert raised.value.reason is GroundingReason.EVIDENCE_NOT_IN_RESUME_TEXT

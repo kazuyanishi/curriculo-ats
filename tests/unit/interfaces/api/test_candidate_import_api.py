@@ -135,8 +135,13 @@ def test_missing_ai_configuration_returns_503(monkeypatch) -> None:
     monkeypatch.delenv("RESUME_AI_MODEL", raising=False)
     response = TestClient(create_app()).post(
         "/api/v1/candidate/import",
-        files={"file": ("resume.docx", _docx_bytes("Jane Doe"),
-                          "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        files={
+            "file": (
+                "resume.docx",
+                _docx_bytes("Jane Doe"),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
     )
 
     assert response.status_code == 503
@@ -171,7 +176,8 @@ def test_happy_path_accepts_pdf_and_docx_case_insensitively(
     assert "resume_text" not in response.text
 
 
-def test_grounding_failure_returns_stable_422(monkeypatch) -> None:
+def test_grounding_failure_returns_stable_422(monkeypatch, caplog) -> None:
+    caplog.set_level("WARNING")
     response = _client(monkeypatch, HallucinatingOpenAIClient).post(
         "/api/v1/candidate/import",
         files={"file": ("resume.docx", _docx_bytes("Python"), "application/octet-stream")},
@@ -179,6 +185,14 @@ def test_grounding_failure_returns_stable_422(monkeypatch) -> None:
 
     assert response.status_code == 422
     assert response.json() == {"detail": "Resume extraction could not be validated"}
+    assert "personal_info.full_name" not in response.text
+    assert "Kubernetes" not in response.text
+    assert "Python" not in response.text
+    assert any(
+        "path=personal_info.full_name reason=evidence_not_in_resume_text" in record.message
+        for record in caplog.records
+    )
+    assert all("Kubernetes" not in record.message for record in caplog.records)
 
 
 def test_ai_failure_returns_stable_502(monkeypatch) -> None:

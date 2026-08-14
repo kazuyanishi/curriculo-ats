@@ -1,3 +1,4 @@
+import logging
 from dataclasses import asdict, is_dataclass
 from enum import StrEnum
 from typing import Annotated, Any
@@ -29,6 +30,7 @@ from resume_ai.modules.jobs.domain.entities import JobPosting
 from resume_ai.modules.optimization.application.services import CandidateAnalysisResult
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 MAX_RESUME_FILE_BYTES = 5 * 1024 * 1024
 
@@ -109,6 +111,11 @@ async def import_candidate_resume(
         try:
             return build_import_candidate_from_resume_text(ai_config).execute(resume_text)
         except ResumeCandidateGroundingError as error:
+            logger.warning(
+                "Candidate resume grounding failed path=%s reason=%s",
+                error.path,
+                error.reason,
+            )
             raise HTTPException(
                 status_code=422, detail="Resume extraction could not be validated"
             ) from error
