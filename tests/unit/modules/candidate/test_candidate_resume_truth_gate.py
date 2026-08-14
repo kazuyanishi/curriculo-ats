@@ -61,6 +61,44 @@ def test_evidence_must_be_literal_inside_resume() -> None:
     assert raised.value.reason is GroundingReason.EVIDENCE_NOT_IN_RESUME_TEXT
 
 
+def test_evidence_failure_reports_whitespace_only_difference() -> None:
+    extraction = CandidateResumeExtraction(
+        experiences=(
+            ExtractedExperience(
+                activities=(
+                    field("Elaboração de manuais e documentação técnica"),
+                )
+            ),
+        )
+    )
+
+    with pytest.raises(ResumeCandidateGroundingError) as raised:
+        CandidateResumeTruthGate().validate(
+            "Elaboração  de manuais\n e documentação técnica", extraction
+        )
+
+    assert raised.value.path == "experiences[0].activities[0]"
+    assert raised.value.reason is GroundingReason.EVIDENCE_NOT_IN_RESUME_TEXT
+    assert raised.value.whitespace_normalized_match is True
+
+
+def test_evidence_failure_reports_non_whitespace_difference() -> None:
+    extraction = CandidateResumeExtraction(
+        experiences=(
+            ExtractedExperience(
+                activities=(field("Elaboração de documentação"),),
+            ),
+        )
+    )
+
+    with pytest.raises(ResumeCandidateGroundingError) as raised:
+        CandidateResumeTruthGate().validate("Elaboração de manuais", extraction)
+
+    assert raised.value.path == "experiences[0].activities[0]"
+    assert raised.value.reason is GroundingReason.EVIDENCE_NOT_IN_RESUME_TEXT
+    assert raised.value.whitespace_normalized_match is False
+
+
 @pytest.mark.parametrize(
     ("resume_text", "value", "evidence"),
     [

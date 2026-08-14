@@ -13,7 +13,13 @@ class GroundingReason(StrEnum):
 class ResumeCandidateGroundingError(Exception):
     """Raised when extracted resume facts are not grounded in source text."""
 
-    def __init__(self, path: str, reason: GroundingReason) -> None:
+    def __init__(
+        self,
+        path: str,
+        reason: GroundingReason,
+        whitespace_normalized_match: bool | None = None,
+    ) -> None:
         self.path = path
         self.reason = reason
+        self.whitespace_normalized_match = whitespace_normalized_match
         super().__init__("Candidate resume extraction is not grounded in source text")

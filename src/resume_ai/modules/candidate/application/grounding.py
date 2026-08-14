@@ -45,7 +45,13 @@ class CandidateResumeTruthGate:
         if field.value not in field.evidence:
             raise ResumeCandidateGroundingError(path, GroundingReason.VALUE_NOT_IN_EVIDENCE)
         if field.evidence not in resume_text:
-            raise ResumeCandidateGroundingError(path, GroundingReason.EVIDENCE_NOT_IN_RESUME_TEXT)
+            normalized_evidence = " ".join(field.evidence.split())
+            normalized_resume_text = " ".join(resume_text.split())
+            raise ResumeCandidateGroundingError(
+                path,
+                GroundingReason.EVIDENCE_NOT_IN_RESUME_TEXT,
+                normalized_evidence in normalized_resume_text,
+            )
 
     @classmethod
     def _validate_optional(
