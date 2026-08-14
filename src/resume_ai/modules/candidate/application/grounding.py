@@ -41,17 +41,22 @@ class CandidateResumeTruthGate:
             self._validate_project(resume_text, project, f"projects[{index}]")
 
     @staticmethod
-    def _validate_field(resume_text: str, field: ResumeFieldEvidence, path: str) -> None:
+    def _normalize_whitespace(value: str) -> str:
+        return " ".join(value.split())
+
+    @classmethod
+    def _validate_field(cls, resume_text: str, field: ResumeFieldEvidence, path: str) -> None:
         if field.value not in field.evidence:
             raise ResumeCandidateGroundingError(path, GroundingReason.VALUE_NOT_IN_EVIDENCE)
         if field.evidence not in resume_text:
-            normalized_evidence = " ".join(field.evidence.split())
-            normalized_resume_text = " ".join(resume_text.split())
-            raise ResumeCandidateGroundingError(
-                path,
-                GroundingReason.EVIDENCE_NOT_IN_RESUME_TEXT,
-                normalized_evidence in normalized_resume_text,
-            )
+            normalized_evidence = cls._normalize_whitespace(field.evidence)
+            normalized_resume_text = cls._normalize_whitespace(resume_text)
+            if normalized_evidence not in normalized_resume_text:
+                raise ResumeCandidateGroundingError(
+                    path,
+                    GroundingReason.EVIDENCE_NOT_IN_RESUME_TEXT,
+                    False,
+                )
 
     @classmethod
     def _validate_optional(

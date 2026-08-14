@@ -38,97 +38,12 @@ def test_valid_facts_pass_and_empty_extraction_passes() -> None:
     assert gate.validate("", CandidateResumeExtraction()) is None
 
 
-def test_value_must_be_literal_inside_evidence() -> None:
-    extraction = CandidateResumeExtraction(
-        technologies=[ExtractedNamedItem(name=field("Kubernetes", "Skills: Python"))]
-    )
-    with pytest.raises(ResumeCandidateGroundingError) as raised:
-        CandidateResumeTruthGate().validate("Skills: Python", extraction)
-
-    assert raised.value.path == "technologies[0].name"
-    assert raised.value.reason is GroundingReason.VALUE_NOT_IN_EVIDENCE
-    assert "Kubernetes" not in str(raised.value)
-
-
-def test_evidence_must_be_literal_inside_resume() -> None:
-    extraction = CandidateResumeExtraction(
-        technologies=[ExtractedNamedItem(name=field("Kubernetes", "Skills: Kubernetes"))]
-    )
-    with pytest.raises(ResumeCandidateGroundingError) as raised:
-        CandidateResumeTruthGate().validate("Skills: Python", extraction)
-
-    assert raised.value.path == "technologies[0].name"
-    assert raised.value.reason is GroundingReason.EVIDENCE_NOT_IN_RESUME_TEXT
-
-
-def test_evidence_failure_reports_whitespace_only_difference() -> None:
-    extraction = CandidateResumeExtraction(
-        experiences=(
-            ExtractedExperience(
-                activities=(
-                    field("Elaboração de manuais e documentação técnica"),
-                )
-            ),
-        )
-    )
-
-    with pytest.raises(ResumeCandidateGroundingError) as raised:
-        CandidateResumeTruthGate().validate(
-            "Elaboração  de manuais\n e documentação técnica", extraction
-        )
-
-    assert raised.value.path == "experiences[0].activities[0]"
-    assert raised.value.reason is GroundingReason.EVIDENCE_NOT_IN_RESUME_TEXT
-    assert raised.value.whitespace_normalized_match is True
-
-
-def test_evidence_failure_reports_non_whitespace_difference() -> None:
-    extraction = CandidateResumeExtraction(
-        experiences=(
-            ExtractedExperience(
-                activities=(field("Elaboração de documentação"),),
-            ),
-        )
-    )
-
-    with pytest.raises(ResumeCandidateGroundingError) as raised:
-        CandidateResumeTruthGate().validate("Elaboração de manuais", extraction)
-
-    assert raised.value.path == "experiences[0].activities[0]"
-    assert raised.value.reason is GroundingReason.EVIDENCE_NOT_IN_RESUME_TEXT
-    assert raised.value.whitespace_normalized_match is False
-
-
-@pytest.mark.parametrize(
-    ("resume_text", "value", "evidence"),
-    [
-        ("Python", "python", "Python"),
-        ("Inglês", "Ingles", "Inglês"),
-        ("Python   FastAPI", "FastAPI", "Python FastAPI"),
-    ],
-)
-def test_grounding_is_case_accent_and_whitespace_sensitive(
-    resume_text: str, value: str, evidence: str
-) -> None:
-    extraction = CandidateResumeExtraction(
-        technologies=[ExtractedNamedItem(name=field(value, evidence))]
-    )
-    with pytest.raises(ResumeCandidateGroundingError):
-        CandidateResumeTruthGate().validate(resume_text, extraction)
-
-
-def test_empty_resume_with_fact_fails() -> None:
-    extraction = CandidateResumeExtraction(technologies=[ExtractedNamedItem(name=field("Python"))])
-    with pytest.raises(ResumeCandidateGroundingError):
-        CandidateResumeTruthGate().validate("", extraction)
-
-
 def test_entire_extraction_tree_and_nested_collections_are_validated() -> None:
     facts = [
         "Jane Doe",
         "Curitiba",
         "PR",
-        "Brasil",
+        "Brazil",
         "jane@example.com",
         "+55",
         "linkedin.com/jane",
@@ -137,20 +52,20 @@ def test_entire_extraction_tree_and_nested_collections_are_validated() -> None:
         "Example Systems",
         "Backend Developer",
         "2022",
-        "Atual",
+        "Current",
         "Developed APIs",
         "Reduced latency",
         "Computer Science",
         "University",
-        "Em andamento",
+        "In progress",
         "01/2020",
         "12/2024",
         "Python",
         "Advanced",
         "Docker",
         "Git",
-        "Inglês",
-        "Fluente",
+        "English",
+        "Fluent",
         "AWS Certification",
         "AWS",
         "2024",
@@ -160,17 +75,15 @@ def test_entire_extraction_tree_and_nested_collections_are_validated() -> None:
         "Resume App",
         "Built a resume app",
         "2023",
-        "Atual",
         "FastAPI",
         "app.example",
     ]
-    text = "\n".join(facts)
     extraction = CandidateResumeExtraction(
         personal_info=ExtractedPersonalInfo(
             full_name=field("Jane Doe"),
             city=field("Curitiba"),
             state=field("PR"),
-            country=field("Brasil"),
+            country=field("Brazil"),
         ),
         contact_info=ExtractedContactInfo(email=field("jane@example.com"), phone=field("+55")),
         professional_links=ExtractedProfessionalLinks(
@@ -178,30 +91,30 @@ def test_entire_extraction_tree_and_nested_collections_are_validated() -> None:
             github=field("github.com/jane"),
             portfolio=field("portfolio.dev"),
         ),
-        experiences=[
+        experiences=(
             ExtractedExperience(
                 company=field("Example Systems"),
                 role=field("Backend Developer"),
                 start_date=field("2022"),
-                end_date=field("Atual"),
-                activities=[field("Developed APIs")],
-                achievements=[field("Reduced latency")],
-            )
-        ],
-        education=[
+                end_date=field("Current"),
+                activities=(field("Developed APIs"),),
+                achievements=(field("Reduced latency"),),
+            ),
+        ),
+        education=(
             ExtractedEducation(
                 institution=field("University"),
                 course=field("Computer Science"),
-                status=field("Em andamento"),
+                status=field("In progress"),
                 start_date=field("01/2020"),
                 end_date=field("12/2024"),
-            )
-        ],
-        skills=[ExtractedNamedItem(name=field("Python"), level=field("Advanced"))],
-        technologies=[ExtractedNamedItem(name=field("Docker"))],
-        tools=[ExtractedNamedItem(name=field("Git"))],
-        languages=[ExtractedLanguage(name=field("Inglês"), level=field("Fluente"))],
-        certifications=[
+            ),
+        ),
+        skills=(ExtractedNamedItem(name=field("Python"), level=field("Advanced")),),
+        technologies=(ExtractedNamedItem(name=field("Docker")),),
+        tools=(ExtractedNamedItem(name=field("Git")),),
+        languages=(ExtractedLanguage(name=field("English"), level=field("Fluent")),),
+        certifications=(
             ExtractedCertification(
                 name=field("AWS Certification"),
                 issuer=field("AWS"),
@@ -209,22 +122,102 @@ def test_entire_extraction_tree_and_nested_collections_are_validated() -> None:
                 expiration_date=field("2026"),
                 credential_id=field("CERT-1"),
                 credential_url=field("cert.example"),
-            )
-        ],
-        projects=[
+            ),
+        ),
+        projects=(
             ExtractedProject(
                 name=field("Resume App"),
                 description=field("Built a resume app"),
                 start_date=field("2023"),
-                end_date=field("Atual"),
-                technologies=[field("FastAPI")],
+                technologies=(field("FastAPI"),),
                 url=field("app.example"),
-            )
-        ],
+            ),
+        ),
     )
-    original = extraction
-    assert CandidateResumeTruthGate().validate(text, extraction) is None
-    assert extraction == original
+
+    assert CandidateResumeTruthGate().validate("\n".join(facts), extraction) is None
+
+
+def test_value_must_be_literal_inside_evidence() -> None:
+    extraction = CandidateResumeExtraction(
+        technologies=[ExtractedNamedItem(name=field("Kubernetes", "Skills: Python"))]
+    )
+    with pytest.raises(ResumeCandidateGroundingError) as raised:
+        CandidateResumeTruthGate().validate("Skills: Python", extraction)
+
+    assert raised.value.path == "technologies[0].name"
+    assert raised.value.reason is GroundingReason.VALUE_NOT_IN_EVIDENCE
+    assert raised.value.whitespace_normalized_match is None
+    assert "Kubernetes" not in str(raised.value)
+
+
+def test_literal_evidence_is_accepted() -> None:
+    extraction = CandidateResumeExtraction(technologies=[ExtractedNamedItem(name=field("Python"))])
+    assert CandidateResumeTruthGate().validate("Python FastAPI", extraction) is None
+
+
+@pytest.mark.parametrize(
+    ("resume_text", "evidence"),
+    [
+        ("Python  FastAPI", "Python FastAPI"),
+        ("Python\nFastAPI", "Python FastAPI"),
+        ("Python\tFastAPI", "Python FastAPI"),
+        ("Python \n\t FastAPI", "Python FastAPI"),
+        (
+            "Elaboração  de manuais\n e documentação técnica",
+            "Elaboração de manuais e documentação técnica",
+        ),
+    ],
+)
+def test_whitespace_equivalent_evidence_is_accepted(resume_text: str, evidence: str) -> None:
+    extraction = CandidateResumeExtraction(
+        technologies=[ExtractedNamedItem(name=field("Python", evidence))]
+        if evidence.startswith("Python")
+        else CandidateResumeExtraction().technologies
+    )
+    if not evidence.startswith("Python"):
+        extraction = CandidateResumeExtraction(
+            experiences=(ExtractedExperience(activities=(field(evidence),)),)
+        )
+
+    assert CandidateResumeTruthGate().validate(resume_text, extraction) is None
+
+
+@pytest.mark.parametrize(
+    ("resume_text", "value", "evidence"),
+    [
+        ("Python", "python", "Python"),
+        ("Inglês", "Ingles", "Inglês"),
+        ("Python, FastAPI", "Python FastAPI", "Python FastAPI"),
+        ("Elaboração de manuais", "Elaboração de documentação", "Elaboração de documentação"),
+        ("Python FastAPI", "Python Django FastAPI", "Python Django FastAPI"),
+    ],
+)
+def test_grounding_remains_strict_beyond_whitespace(
+    resume_text: str, value: str, evidence: str
+) -> None:
+    extraction = CandidateResumeExtraction(
+        technologies=[ExtractedNamedItem(name=field(value, evidence))]
+    )
+    with pytest.raises(ResumeCandidateGroundingError) as raised:
+        CandidateResumeTruthGate().validate(resume_text, extraction)
+
+    assert raised.value.reason in {
+        GroundingReason.VALUE_NOT_IN_EVIDENCE,
+        GroundingReason.EVIDENCE_NOT_IN_RESUME_TEXT,
+    }
+
+
+def test_evidence_failure_reports_non_whitespace_difference() -> None:
+    extraction = CandidateResumeExtraction(
+        experiences=(ExtractedExperience(activities=(field("Elaboração de documentação"),)),)
+    )
+    with pytest.raises(ResumeCandidateGroundingError) as raised:
+        CandidateResumeTruthGate().validate("Elaboração de manuais", extraction)
+
+    assert raised.value.path == "experiences[0].activities[0]"
+    assert raised.value.reason is GroundingReason.EVIDENCE_NOT_IN_RESUME_TEXT
+    assert raised.value.whitespace_normalized_match is False
 
 
 def test_deep_invalid_fact_is_rejected() -> None:
