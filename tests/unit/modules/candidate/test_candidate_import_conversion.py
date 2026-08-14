@@ -123,6 +123,7 @@ def test_experience_month_interval_is_split(
 
     assert draft.experiences[0].start_date == expected_start
     assert draft.experiences[0].end_date == expected_end
+    assert draft.experiences[0].is_current is (expected_end is None and value.endswith("Atual"))
     assert not any(
         issue.path == "experiences[0].start_date"
         and issue.code == CandidateImportIssueCode.UNSUPPORTED_DATE_FORMAT
@@ -141,6 +142,37 @@ def test_experience_separate_dates_keep_existing_conversion() -> None:
 
     assert draft.experiences[0].start_date == "2024-10"
     assert draft.experiences[0].end_date == "2025-10"
+    assert draft.experiences[0].is_current is False
+
+
+def test_explicit_current_end_marker_is_preserved() -> None:
+    extraction = CandidateResumeExtraction(
+        experiences=(
+            ExtractedExperience(start_date=evidence("11/2025"), end_date=evidence("Atual")),
+        )
+    )
+
+    draft = CandidateResumeDraftConverter().convert(extraction)
+
+    assert draft.experiences[0].start_date == "2025-11"
+    assert draft.experiences[0].end_date is None
+    assert draft.experiences[0].is_current is True
+    assert not any(
+        issue.path == "experiences[0].end_date"
+        and issue.code == CandidateImportIssueCode.UNSUPPORTED_DATE_FORMAT
+        for issue in draft.issues
+    )
+
+
+def test_missing_experience_end_date_is_not_current() -> None:
+    extraction = CandidateResumeExtraction(
+        experiences=(ExtractedExperience(start_date=evidence("11/2025")),)
+    )
+
+    draft = CandidateResumeDraftConverter().convert(extraction)
+
+    assert draft.experiences[0].is_current is False
+    assert draft.experiences[0].end_date is None
 
 
 def test_invalid_experience_interval_is_not_silently_converted() -> None:

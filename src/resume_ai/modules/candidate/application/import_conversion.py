@@ -32,6 +32,8 @@ from resume_ai.modules.candidate.domain.entities import (
 )
 from resume_ai.modules.candidate.domain.value_objects import YearMonth
 
+_CURRENT_MARKERS = frozenset({"atual", "present", "current"})
+
 
 def _value(field: ResumeFieldEvidence | None) -> str | None:
     return None if field is None else field.value
@@ -69,7 +71,7 @@ def _try_month(
         return None
 
     marker = value.strip().casefold()
-    if allow_current and marker in {"atual", "present", "current"}:
+    if allow_current and marker in _CURRENT_MARKERS:
         return None
 
     if len(value) == 7 and value[4] == "-":
@@ -141,7 +143,7 @@ def _try_experience_interval(
     start_path: str,
     end_path: str,
     issues: list[CandidateImportIssue],
-) -> tuple[str | None, str | None] | None:
+) -> tuple[str | None, str | None, bool] | None:
     match = re.fullmatch(
         r"\s*(\d{2}/\d{4})\s*-\s*(\d{2}/\d{4}|Atual|Present|Current)\s*",
         field.value,
@@ -154,9 +156,9 @@ def _try_experience_interval(
     interval_end = ResumeFieldEvidence(value=match.group(2), evidence=match.group(2))
     start_date = _try_month(interval_start, start_path, issues)
     if start_date is None:
-        return None, None
+        return None, None, False
     end_date = _try_month(interval_end, end_path, issues, allow_current=True)
-    return start_date, end_date
+    return start_date, end_date, interval_end.value.strip().casefold() in _CURRENT_MARKERS
 
 
 def _map_closed(
@@ -238,6 +240,12 @@ def _convert_experience(
         if item.start_date is not None and item.end_date is None
         else None
     )
+    is_current = (
+        interval[2]
+        if interval is not None
+        else item.end_date is not None
+        and item.end_date.value.strip().casefold() in _CURRENT_MARKERS
+    )
     return ExperienceDraft(
         company=_required_value(item.company, f"{prefix}.company", issues),
         role=_required_value(item.role, f"{prefix}.role", issues),
@@ -255,6 +263,7 @@ def _convert_experience(
             if interval is not None
             else _try_month(item.end_date, f"{prefix}.end_date", issues, allow_current=True)
         ),
+        is_current=is_current,
         activities=tuple(field.value for field in item.activities),
         achievements=tuple(field.value for field in item.achievements),
     )

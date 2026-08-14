@@ -50,6 +50,7 @@ class ExperienceDraft(_DraftSchema):
     role: str | None = None
     start_date: str | None = None
     end_date: str | None = None
+    is_current: bool = False
     activities: tuple[str, ...] = ()
     achievements: tuple[str, ...] = ()
 
@@ -93,9 +94,7 @@ class ProjectDraft(_DraftSchema):
 class CandidateImportDraft(_DraftSchema):
     personal_info: PersonalInfoDraft = Field(default_factory=PersonalInfoDraft)
     contact_info: ContactInfoDraft = Field(default_factory=ContactInfoDraft)
-    professional_links: ProfessionalLinksDraft = Field(
-        default_factory=ProfessionalLinksDraft
-    )
+    professional_links: ProfessionalLinksDraft = Field(default_factory=ProfessionalLinksDraft)
     experiences: tuple[ExperienceDraft, ...] = ()
     education: tuple[EducationDraft, ...] = ()
     skills: tuple[NamedItemDraft, ...] = ()

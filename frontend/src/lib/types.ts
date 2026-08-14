@@ -46,7 +46,7 @@ export type PersonalInfoDraft = { full_name: string | null; city: string | null;
 export type ContactInfoDraft = { email: string | null; phone: string | null };
 export type ProfessionalLinksDraft = { linkedin: string | null; github: string | null; portfolio: string | null };
 export type ExperienceDraft = {
-  company: string | null; role: string | null; start_date: string | null; end_date: string | null;
+  company: string | null; role: string | null; start_date: string | null; end_date: string | null; is_current: boolean;
   activities: string[]; achievements: string[];
 };
 export type EducationDraft = {
