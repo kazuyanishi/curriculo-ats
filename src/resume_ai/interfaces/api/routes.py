@@ -125,6 +125,11 @@ async def import_candidate_resume(
                 status_code=422, detail="Resume extraction could not be validated"
             ) from error
         except Exception as error:
+            logger.error(
+                "Candidate resume AI integration failed exception_module=%s exception_type=%s",
+                type(error).__module__,
+                type(error).__name__,
+            )
             raise HTTPException(status_code=502, detail="AI integration failed") from error
     finally:
         await file.close()

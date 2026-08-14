@@ -39,6 +39,15 @@ class FailingOpenAIClient(FakeOpenAIClient):
         raise RuntimeError("AI failure")
 
 
+class SyntheticAIError(Exception):
+    pass
+
+
+class SyntheticFailingOpenAIClient(FakeOpenAIClient):
+    def generate(self, **kwargs: object):
+        raise SyntheticAIError("SECRET_RESUME_CONTENT")
+
+
 class HallucinatingOpenAIClient(FakeOpenAIClient):
     def generate(self, *, system_prompt: str, user_prompt: str, response_model):
         return CandidateResumeExtraction(
@@ -203,3 +212,21 @@ def test_ai_failure_returns_stable_502(monkeypatch) -> None:
 
     assert response.status_code == 502
     assert response.json() == {"detail": "AI integration failed"}
+
+
+def test_ai_failure_logs_only_exception_metadata(monkeypatch, caplog) -> None:
+    caplog.set_level("ERROR")
+    response = _client(monkeypatch, SyntheticFailingOpenAIClient).post(
+        "/api/v1/candidate/import",
+        files={"file": ("resume.pdf", _pdf_bytes("Jane Doe"), "application/octet-stream")},
+    )
+
+    assert response.status_code == 502
+    assert response.json() == {"detail": "AI integration failed"}
+    messages = [record.message for record in caplog.records]
+    assert any(
+        f"exception_module={SyntheticAIError.__module__}" in message
+        and "exception_type=SyntheticAIError" in message
+        for message in messages
+    )
+    assert all("SECRET_RESUME_CONTENT" not in message for message in messages)
