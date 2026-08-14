@@ -151,6 +151,39 @@ def test_value_must_be_literal_inside_evidence() -> None:
     assert "Kubernetes" not in str(raised.value)
 
 
+def test_project_description_must_be_literal_inside_evidence() -> None:
+    extraction = CandidateResumeExtraction(
+        projects=(
+            ExtractedProject(
+                description=field(
+                    "Desenvolvimento de um sistema ERP completo.",
+                    "Desenvolvimento e evolução de sistema ERP próprio.",
+                )
+            ),
+        )
+    )
+
+    with pytest.raises(ResumeCandidateGroundingError) as raised:
+        CandidateResumeTruthGate().validate(
+            "Desenvolvimento e evolução de sistema ERP próprio.", extraction
+        )
+
+    assert raised.value.path == "projects[0].description"
+    assert raised.value.reason is GroundingReason.VALUE_NOT_IN_EVIDENCE
+
+
+def test_literal_project_description_passes_grounding() -> None:
+    description = "Desenvolvimento e evolução de sistema ERP próprio."
+    extraction = CandidateResumeExtraction(
+        projects=(ExtractedProject(description=field(description)),)
+    )
+
+    assert (
+        CandidateResumeTruthGate().validate(f"PROJETO: Sistema ERP\n{description}", extraction)
+        is None
+    )
+
+
 def test_literal_evidence_is_accepted() -> None:
     extraction = CandidateResumeExtraction(technologies=[ExtractedNamedItem(name=field("Python"))])
     assert CandidateResumeTruthGate().validate("Python FastAPI", extraction) is None
