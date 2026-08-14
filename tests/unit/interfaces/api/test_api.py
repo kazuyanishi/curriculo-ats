@@ -177,6 +177,7 @@ def test_analyze_uses_grounded_semantic_fallback(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert response.json()["matching"][0]["status"] == "matched"
+    assert "candidate_evidence_paths" not in response.json()["matching"][0]
     assert response.json()["gaps"]["gaps"] == []
 
 

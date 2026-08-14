@@ -15,12 +15,21 @@ class MatchStatus(StrEnum):
 class CriterionMatch:
     criterion: JobCriterion
     status: MatchStatus
+    candidate_evidence_paths: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.criterion, JobCriterion):
             raise DomainError("criterion must be a JobCriterion")
         if not isinstance(self.status, MatchStatus):
             raise DomainError("status must be a MatchStatus")
+        if not isinstance(self.candidate_evidence_paths, tuple):
+            raise DomainError("candidate_evidence_paths must be a tuple")
+        if not all(
+            isinstance(path, str) and path.strip() for path in self.candidate_evidence_paths
+        ):
+            raise DomainError("candidate_evidence_paths must contain only non-blank strings")
+        if len(set(self.candidate_evidence_paths)) != len(self.candidate_evidence_paths):
+            raise DomainError("candidate_evidence_paths must not contain duplicates")
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,9 +48,7 @@ class MatchingResult:
 
     @property
     def not_matched(self) -> tuple[CriterionMatch, ...]:
-        return tuple(
-            match for match in self.matches if match.status is MatchStatus.NOT_MATCHED
-        )
+        return tuple(match for match in self.matches if match.status is MatchStatus.NOT_MATCHED)
 
     @property
     def unsupported(self) -> tuple[CriterionMatch, ...]:
