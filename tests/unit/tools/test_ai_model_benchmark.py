@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from resume_ai.integrations.ai.client import AIUsage
+from resume_ai.integrations.ai.client import AIUsage, StructuredAIOutputError
 from resume_ai.modules.candidate.application.import_schemas import CandidateResumeExtraction
 from resume_ai.modules.jobs.application.schemas import JobCriteriaInput
 from resume_ai.modules.matching.application.semantic_schemas import SemanticMatchBatch
@@ -29,14 +29,33 @@ class FakeStructuredAIClient:
         self._observer = observer
         self._usage = AIUsage(1000, 400, 200) if usage is None else usage
         self.calls = 0
+        self.requests = []
 
     def generate(self, *, system_prompt, user_prompt, response_model):
         self.calls += 1
+        self.requests.append((system_prompt, user_prompt, response_model))
         self._observer.record("fake", self._usage)
         return next(self._responses)
 
 
-def candidate_extraction() -> CandidateResumeExtraction:
+def candidate_extraction(reordered: bool = False) -> CandidateResumeExtraction:
+    activities = [
+        {
+            "value": "Atendimento e acompanhamento de chamados.",
+            "evidence": "Atendimento e acompanhamento de chamados.",
+        },
+        {
+            "value": "Organização de demandas no Jira.",
+            "evidence": "Organização de demandas no Jira.",
+        },
+    ]
+    technologies = [
+        {"name": {"value": "Python", "evidence": "Python"}},
+        {"name": {"value": "PostgreSQL", "evidence": "PostgreSQL"}},
+    ]
+    if reordered:
+        activities.reverse()
+        technologies.reverse()
     return CandidateResumeExtraction.model_validate(
         {
             "personal_info": {
@@ -49,16 +68,7 @@ def candidate_extraction() -> CandidateResumeExtraction:
                 {
                     "company": {"value": "Example Systems", "evidence": "Example Systems"},
                     "role": {"value": "Support Analyst", "evidence": "Support Analyst"},
-                    "activities": [
-                        {
-                            "value": "Atendimento e acompanhamento de chamados.",
-                            "evidence": "Atendimento e acompanhamento de chamados.",
-                        },
-                        {
-                            "value": "Organização de demandas no Jira.",
-                            "evidence": "Organização de demandas no Jira.",
-                        },
-                    ],
+                    "activities": activities,
                 }
             ],
             "education": [
@@ -69,17 +79,19 @@ def candidate_extraction() -> CandidateResumeExtraction:
                     }
                 }
             ],
-            "technologies": [{"name": {"value": "Python", "evidence": "Python"}}],
+            "technologies": technologies,
         }
     )
 
 
-def job_criteria(count=4) -> JobCriteriaInput:
+def job_criteria(count=6) -> JobCriteriaInput:
     evidence = (
         "Knowledge of infrastructure, networks and technical support.",
         "Experience with Jira ticket management.",
         "Knowledge of information security best practices.",
         "English proficiency.",
+        "Provide technical support to internal users.",
+        "Troubleshoot hardware and software issues.",
     )[:count]
     return JobCriteriaInput.model_validate(
         {"criteria": [{"category": "skill", "value": item, "evidence": item} for item in evidence]}
@@ -181,6 +193,28 @@ def test_cost_estimation_uses_decimal_and_cached_rate() -> None:
     assert estimate_cost(AIUsage(10, 0, 5), None) is None
 
 
+def test_missing_structured_output_is_a_schema_hard_fail_with_usage() -> None:
+    class StructuredOutputFailureClient:
+        def __init__(self, observer) -> None:
+            self._observer = observer
+
+        def generate(self, *, system_prompt, user_prompt, response_model):
+            self._observer.record("model-a", AIUsage(1000, 400, 200))
+            raise StructuredAIOutputError("missing parsed output")
+
+    result = BenchmarkRunner((BENCHMARK_CASES[0],)).run(
+        BenchmarkConfig(("model-a",), max_calls=1),
+        lambda model, observer: StructuredOutputFailureClient(observer),
+    )[0]
+
+    assert result.failure_kind is BenchmarkFailureKind.SCHEMA
+    assert result.hard_fail is True
+    assert result.quality_score is None
+    assert result.input_tokens == 1000
+    assert result.cached_input_tokens == 400
+    assert result.output_tokens == 200
+
+
 def test_pricing_snapshot_is_loaded_from_local_decimal_strings(tmp_path) -> None:
     path = tmp_path / "pricing.local.json"
     path.write_text(
@@ -221,14 +255,37 @@ def test_grounding_failure_is_a_hard_fail() -> None:
 def test_job_recall_and_semantic_accuracy_are_measured() -> None:
     clients = []
     job_result = BenchmarkRunner((BENCHMARK_CASES[1],)).run(
-        BenchmarkConfig(("model-a",), max_calls=1), factory_with((job_criteria(3),), clients)
+        BenchmarkConfig(("model-a",), max_calls=1), factory_with((job_criteria(4),), clients)
     )[0]
     semantic_result = BenchmarkRunner((BENCHMARK_CASES[2],)).run(
         BenchmarkConfig(("model-a",), max_calls=1), factory_with((semantic_batch(),), clients)
     )[0]
 
-    assert job_result.quality_score == 0.75
+    assert job_result.quality_score == 4 / 6
     assert semantic_result.quality_score == 1.0
+
+
+def test_candidate_quality_ignores_technology_and_activity_order() -> None:
+    result = BenchmarkRunner((BENCHMARK_CASES[0],)).run(
+        BenchmarkConfig(("model-a",), max_calls=1), factory_with((candidate_extraction(True),), [])
+    )[0]
+
+    assert result.quality_score == 1.0
+
+
+def test_semantic_duration_fixture_is_open_ended_and_unsupported() -> None:
+    clients = []
+    result = BenchmarkRunner((BENCHMARK_CASES[2],)).run(
+        BenchmarkConfig(("model-a",), max_calls=1), factory_with((semantic_batch(),), clients)
+    )[0]
+    payload = json.loads(clients[0].requests[0][1])
+    catalog = {item["path"]: item["text"] for item in payload["candidate_evidence_catalog"]}
+
+    assert result.quality_score == 1.0
+    assert (
+        catalog["experiences[1].activities[0].description"] == "Managing datacenter infrastructure."
+    )
+    assert "experiences[1].end_date" not in catalog
 
 
 def test_result_file_contains_only_metrics(tmp_path) -> None:
