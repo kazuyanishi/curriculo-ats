@@ -10,8 +10,7 @@ class CandidateJobMatcher(Protocol):
         self,
         candidate: Candidate,
         criteria: JobCriteria,
-    ) -> MatchingResult:
-        ...
+    ) -> MatchingResult: ...
 
 
 class CandidateCriterionMatcher(Protocol):
@@ -19,5 +18,12 @@ class CandidateCriterionMatcher(Protocol):
         self,
         candidate: Candidate,
         criterion: JobCriterion,
-    ) -> CriterionMatch:
-        ...
+    ) -> CriterionMatch: ...
+
+
+class CandidateMatchingRefiner(Protocol):
+    def refine(
+        self,
+        candidate: Candidate,
+        result: MatchingResult,
+    ) -> MatchingResult: ...

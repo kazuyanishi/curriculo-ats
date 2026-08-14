@@ -165,6 +165,10 @@ class FakeOpenAIClient:
         user_prompt: str,
         response_model: type[JobCriteriaInput],
     ) -> JobCriteriaInput:
+        if response_model.__name__ == "SemanticMatchBatch":
+            return response_model(
+                decisions=({"criterion_index": 0, "status": "not_matched"},)
+            )
         assert self.response is not None
         return self.response
 

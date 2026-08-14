@@ -9,6 +9,7 @@ from resume_ai.integrations.ai.config import AIConfig
 from resume_ai.interfaces.api.app import create_app
 from resume_ai.interfaces.api.routes import _json_value
 from resume_ai.modules.candidate.domain.value_objects import YearMonth
+from resume_ai.modules.matching.application.semantic_schemas import SemanticMatchBatch
 
 
 def _candidate_payload() -> dict:
@@ -28,6 +29,8 @@ class FakeOpenAIClient:
         self.config = config
 
     def generate(self, *, system_prompt: str, user_prompt: str, response_model):
+        if response_model.__name__ == "SemanticMatchBatch":
+            return response_model(decisions=({"criterion_index": 0, "status": "not_matched"},))
         return response_model(
             criteria=[
                 {
@@ -37,6 +40,30 @@ class FakeOpenAIClient:
                     "importance": "required",
                 }
             ]
+        )
+
+
+class FakeHybridOpenAIClient(FakeOpenAIClient):
+    def generate(self, *, system_prompt: str, user_prompt: str, response_model):
+        if response_model.__name__ == "JobCriteriaInput":
+            return response_model(
+                criteria=[
+                    {
+                        "category": "skill",
+                        "value": "Infrastructure and networks",
+                        "evidence": "Infrastructure and networks are required.",
+                        "importance": "required",
+                    }
+                ]
+            )
+        return SemanticMatchBatch(
+            decisions=(
+                {
+                    "criterion_index": 0,
+                    "status": "matched",
+                    "evidence_paths": ("experiences[0].activities[0].description",),
+                },
+            )
         )
 
 
@@ -125,6 +152,32 @@ def test_analyze_uses_pipeline_and_returns_structured_response(monkeypatch) -> N
     assert body["score"]
     assert "gaps" in body and "unsupported" in body["gaps"]
     assert body["optimized_candidate"]["personal_info"]["full_name"] == "Jane Doe"
+
+
+def test_analyze_uses_grounded_semantic_fallback(monkeypatch) -> None:
+    monkeypatch.setattr("resume_ai.bootstrap.OpenAIStructuredAIClient", FakeHybridOpenAIClient)
+    candidate = _candidate_payload()
+    candidate["experiences"] = [
+        {
+            "company": "Example Systems",
+            "role": "Support Analyst",
+            "start_date": "2020-01",
+            "end_date": "2024-01",
+            "activities": [{"description": "Configuração de redes e servidores."}],
+        }
+    ]
+
+    response = TestClient(create_app(AIConfig("key", "model"))).post(
+        "/api/v1/analyze",
+        json={
+            "candidate": candidate,
+            "job": {"description": "Infrastructure and networks are required."},
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["matching"][0]["status"] == "matched"
+    assert response.json()["gaps"]["gaps"] == []
 
 
 def test_analyze_optimized_candidate_round_trips_to_documents(monkeypatch) -> None:

@@ -22,7 +22,10 @@ from resume_ai.modules.jobs.application.services import ExtractJobCriteria, Load
 from resume_ai.modules.jobs.domain.services import JobCriteriaTruthGate
 from resume_ai.modules.jobs.infrastructure.ai_extractor import AIJobCriteriaExtractor
 from resume_ai.modules.jobs.infrastructure.text_repository import TextJobRepository
-from resume_ai.modules.matching.application.matchers import DeterministicCandidateJobMatcher
+from resume_ai.modules.matching.application.matchers import (
+    DeterministicCandidateJobMatcher,
+    HybridCandidateJobMatcher,
+)
 from resume_ai.modules.matching.application.services import (
     AnalyzeMatchingGaps,
     CalculateMatchingScore,
@@ -33,6 +36,9 @@ from resume_ai.modules.matching.domain.services import (
     DeterministicGapAnalyzer,
     ExactCandidateCriterionMatcher,
     MatchingScoreCalculator,
+)
+from resume_ai.modules.matching.infrastructure.semantic_refiner import (
+    AISemanticMatchingRefiner,
 )
 from resume_ai.modules.optimization.application.services import (
     AnalyzeCandidateForJob,
@@ -78,6 +84,12 @@ def build_match_candidate_to_job() -> MatchCandidateToJob:
     return MatchCandidateToJob(matcher)
 
 
+def build_hybrid_match_candidate_to_job(config: AIConfig) -> MatchCandidateToJob:
+    deterministic_matcher = DeterministicCandidateJobMatcher(ExactCandidateCriterionMatcher())
+    semantic_refiner = AISemanticMatchingRefiner(OpenAIStructuredAIClient(config))
+    return MatchCandidateToJob(HybridCandidateJobMatcher(deterministic_matcher, semantic_refiner))
+
+
 def build_calculate_matching_score() -> CalculateMatchingScore:
     calculator = MatchingScoreCalculator()
     return CalculateMatchingScore(calculator)
@@ -95,7 +107,10 @@ def build_optimize_candidate() -> OptimizeCandidate:
 def build_analyze_candidate_for_job(config: AIConfig) -> AnalyzeCandidateForJob:
     return AnalyzeCandidateForJob(
         criteria_extractor=build_extract_job_criteria(config),
-        matcher=build_match_and_score_candidate_to_job(),
+        matcher=MatchAndScoreCandidateToJob(
+            build_hybrid_match_candidate_to_job(config),
+            build_calculate_matching_score(),
+        ),
         gap_analyzer=build_analyze_matching_gaps(),
         optimizer=build_optimize_candidate(),
     )
