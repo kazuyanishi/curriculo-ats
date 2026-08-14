@@ -22,7 +22,9 @@ export function candidateFromImportDraft(
 
   const experiences = draft.experiences.map((experience, index) => {
     const end_date = experience.end_date;
-    if (end_date === null) review_paths.push(`experiences[${index}].end_date`);
+    if (end_date === null && !experience.is_current) {
+      review_paths.push(`experiences[${index}].end_date`);
+    }
     return {
       company: textOrEmpty(experience.company),
       role: textOrEmpty(experience.role),
