@@ -112,9 +112,11 @@ async def import_candidate_resume(
             return build_import_candidate_from_resume_text(ai_config).execute(resume_text)
         except ResumeCandidateGroundingError as error:
             logger.warning(
-                "Candidate resume grounding failed path=%s reason=%s",
+                "Candidate resume grounding failed path=%s reason=%s "
+                "whitespace_normalized_match=%s",
                 error.path,
                 error.reason,
+                str(error.whitespace_normalized_match).lower(),
             )
             raise HTTPException(
                 status_code=422, detail="Resume extraction could not be validated"
