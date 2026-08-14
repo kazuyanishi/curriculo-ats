@@ -17,6 +17,10 @@ class AIUsageObserver(Protocol):
     def record(self, model: str, usage: AIUsage) -> None: ...
 
 
+class StructuredAIOutputError(Exception):
+    """Raised when a structured AI response does not contain parsed output."""
+
+
 class StructuredAIClient(Protocol):
     def generate(
         self,

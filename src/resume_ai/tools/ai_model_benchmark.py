@@ -17,7 +17,12 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from resume_ai.core.exceptions import DomainError
-from resume_ai.integrations.ai.client import AIUsage, AIUsageObserver, StructuredAIClient
+from resume_ai.integrations.ai.client import (
+    AIUsage,
+    AIUsageObserver,
+    StructuredAIClient,
+    StructuredAIOutputError,
+)
 from resume_ai.integrations.ai.config import AIConfig
 from resume_ai.integrations.ai.openai_client import OpenAIStructuredAIClient
 from resume_ai.modules.candidate.application.exceptions import ResumeCandidateGroundingError
@@ -167,35 +172,50 @@ ClientFactory = Callable[[str, AIUsageObserver], StructuredAIClient]
 
 
 def _candidate_fact_score(extraction: CandidateResumeExtraction) -> float:
+    experience = next(
+        (
+            item
+            for item in extraction.experiences
+            if item.company is not None
+            and item.company.value == "Sample Company"
+            and item.role is not None
+            and item.role.value == "Operations Specialist"
+        ),
+        None,
+    )
     facts = (
-        extraction.personal_info.full_name,
-        extraction.personal_info.city,
-        extraction.personal_info.state,
-        extraction.personal_info.country,
-        extraction.experiences[0].company if extraction.experiences else None,
-        extraction.experiences[0].role if extraction.experiences else None,
-        extraction.experiences[0].activities[1]
-        if extraction.experiences and len(extraction.experiences[0].activities) > 1
-        else None,
-        extraction.education[0].course if extraction.education else None,
-        extraction.technologies[0].name if extraction.technologies else None,
+        extraction.personal_info.full_name is not None
+        and extraction.personal_info.full_name.value == "Alex Example",
+        extraction.personal_info.city is not None
+        and extraction.personal_info.city.value == "Example City",
+        extraction.personal_info.state is not None
+        and extraction.personal_info.state.value == "Example State",
+        extraction.personal_info.country is not None
+        and extraction.personal_info.country.value == "Brasil",
+        any(
+            item.company is not None and item.company.value == "Sample Company"
+            for item in extraction.experiences
+        ),
+        any(
+            item.company is not None
+            and item.company.value == "Sample Company"
+            and item.role is not None
+            and item.role.value == "Operations Specialist"
+            for item in extraction.experiences
+        ),
+        experience is not None
+        and any(
+            activity.value == "Preparação de relatórios semanais."
+            for activity in experience.activities
+        ),
+        any(
+            education.course is not None
+            and education.course.value == "Sample Degree Program"
+            for education in extraction.education
+        ),
+        any(technology.name.value == "Python" for technology in extraction.technologies),
     )
-    expected = (
-        "Alex Example",
-        "Example City",
-        "Example State",
-        "Brasil",
-        "Sample Company",
-        "Operations Specialist",
-        "Preparação de relatórios semanais.",
-        "Sample Degree Program",
-        "Python",
-    )
-    found = sum(
-        field is not None and field.value == value
-        for field, value in zip(facts, expected, strict=True)
-    )
-    return found / len(expected)
+    return sum(facts) / len(facts)
 
 
 def _synthetic_semantic_candidate() -> Candidate:
@@ -213,6 +233,13 @@ def _synthetic_semantic_candidate() -> Candidate:
                     Activity("Atualização de tarefas no SampleBoard."),
                     Activity("Reconciled stock discrepancies."),
                 ),
+            ),
+            Experience(
+                "Sample Company",
+                "Reporting Specialist",
+                YearMonth("2024-01"),
+                None,
+                activities=(Activity("Coordinating monthly reporting."),),
             ),
         ),
     )
@@ -255,9 +282,11 @@ class BenchmarkCase:
                 "Knowledge of spreadsheet software.",
                 "Attention to data quality.",
                 "English proficiency.",
+                "Update inventory records.",
+                "Prepare weekly operational reports.",
             )
             return sum(
-                any(item.evidence == evidence for item in criteria.criteria)
+                any(evidence in item.evidence for item in criteria.criteria)
                 for evidence in expected
             ) / len(expected)
         result = AISemanticMatchingRefiner(client).refine(
@@ -316,7 +345,7 @@ def _failure(error: Exception) -> tuple[BenchmarkFailureKind, bool]:
         error, (ResumeCandidateGroundingError, SemanticMatchingGroundingError, DomainError)
     ):
         return BenchmarkFailureKind.GROUNDING, True
-    if isinstance(error, ValidationError):
+    if isinstance(error, (ValidationError, StructuredAIOutputError)):
         return BenchmarkFailureKind.SCHEMA, True
     if isinstance(error, TimeoutError):
         return BenchmarkFailureKind.TIMEOUT, False

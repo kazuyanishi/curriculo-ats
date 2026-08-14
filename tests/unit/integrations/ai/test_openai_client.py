@@ -5,7 +5,12 @@ import pytest
 from pydantic import BaseModel
 
 import resume_ai.integrations.ai.openai_client as openai_client_module
-from resume_ai.integrations.ai.client import AIUsage, StructuredAIClient, TStructured
+from resume_ai.integrations.ai.client import (
+    AIUsage,
+    StructuredAIClient,
+    StructuredAIOutputError,
+    TStructured,
+)
 from resume_ai.integrations.ai.config import AIConfig
 from resume_ai.integrations.ai.openai_client import OpenAIStructuredAIClient
 
@@ -96,10 +101,49 @@ def test_client_rejects_missing_parsed_output(
     monkeypatch.setattr(openai_client_module, "OpenAI", OpenAIWithoutResult)
 
     with pytest.raises(
-        ValueError,
+        StructuredAIOutputError,
         match="OpenAI response did not include parsed structured output",
     ):
         _generate(OpenAIStructuredAIClient(AIConfig("key", "model")))
+
+
+def test_client_reports_usage_before_rejecting_missing_parsed_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Usage:
+        input_tokens = 1000
+        output_tokens = 200
+
+        class input_tokens_details:
+            cached_tokens = 400
+
+    class ResponseWithUsage(FakeResponse):
+        usage = Usage()
+
+    class ResponsesWithUsage(FakeResponses):
+        def parse(self, **kwargs: object) -> ResponseWithUsage:
+            self.calls.append(kwargs)
+            return ResponseWithUsage(None)
+
+    class OpenAIWithoutParsedOutput(FakeOpenAI):
+        def __init__(self, *, api_key: str) -> None:
+            self.api_key = api_key
+            self.responses = ResponsesWithUsage(None)
+
+    class Observer:
+        def __init__(self) -> None:
+            self.records: list[tuple[str, AIUsage]] = []
+
+        def record(self, model: str, usage: AIUsage) -> None:
+            self.records.append((model, usage))
+
+    monkeypatch.setattr(openai_client_module, "OpenAI", OpenAIWithoutParsedOutput)
+    observer = Observer()
+
+    with pytest.raises(StructuredAIOutputError):
+        _generate(OpenAIStructuredAIClient(AIConfig("key", "model"), observer))
+
+    assert observer.records == [("model", AIUsage(1000, 400, 200))]
 
 
 def test_client_reports_optional_usage_to_observer(monkeypatch: pytest.MonkeyPatch) -> None:
