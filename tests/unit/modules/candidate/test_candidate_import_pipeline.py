@@ -2,7 +2,10 @@ from typing import get_type_hints
 
 import pytest
 
-from resume_ai.modules.candidate.application.exceptions import ResumeCandidateGroundingError
+from resume_ai.modules.candidate.application.exceptions import (
+    GroundingReason,
+    ResumeCandidateGroundingError,
+)
 from resume_ai.modules.candidate.application.grounding import CandidateResumeTruthGate
 from resume_ai.modules.candidate.application.import_conversion import (
     CandidateResumeDraftConverter,
@@ -122,7 +125,9 @@ def test_extractor_failure_stops_gate_and_converter() -> None:
 def test_truth_gate_failure_stops_converter_and_preserves_exception() -> None:
     events = []
     extraction = CandidateResumeExtraction()
-    error = ResumeCandidateGroundingError("grounding failure")
+    error = ResumeCandidateGroundingError(
+        "personal_info.full_name", GroundingReason.EVIDENCE_NOT_IN_RESUME_TEXT
+    )
     extractor = RecordingExtractor(extraction=extraction, events=events)
     gate = RecordingGate(events, error=error)
     converter = RecordingConverter(events)
