@@ -1,6 +1,12 @@
 from dataclasses import dataclass
+from enum import StrEnum
 
 from resume_ai.core.exceptions import DomainError
+
+
+class OptimizationStatementVerdict(StrEnum):
+    SUPPORTED = "supported"
+    UNSUPPORTED = "unsupported"
 
 
 def _require_indexes(values: object) -> None:
@@ -58,4 +64,31 @@ class CandidateOptimizationProposal:
         if not isinstance(self.experiences, tuple):
             raise DomainError("experiences must be a tuple")
         if not all(isinstance(item, ExperienceOptimizationProposal) for item in self.experiences):
+            raise DomainError("experiences contains an invalid item")
+
+
+@dataclass(frozen=True, slots=True)
+class ValidatedExperienceOptimization:
+    experience_index: int
+    statements: tuple[OptimizedExperienceStatementProposal, ...] = ()
+
+    def __post_init__(self) -> None:
+        if type(self.experience_index) is not int or self.experience_index < 0:
+            raise DomainError("experience_index must be a non-negative int")
+        if not isinstance(self.statements, tuple):
+            raise DomainError("statements must be a tuple")
+        if not all(
+            isinstance(item, OptimizedExperienceStatementProposal) for item in self.statements
+        ):
+            raise DomainError("statements contains an invalid item")
+
+
+@dataclass(frozen=True, slots=True)
+class ValidatedCandidateOptimizationProposal:
+    experiences: tuple[ValidatedExperienceOptimization, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.experiences, tuple):
+            raise DomainError("experiences must be a tuple")
+        if not all(isinstance(item, ValidatedExperienceOptimization) for item in self.experiences):
             raise DomainError("experiences contains an invalid item")
