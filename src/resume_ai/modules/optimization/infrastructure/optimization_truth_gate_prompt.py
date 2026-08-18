@@ -15,5 +15,5 @@ or a conservative combination of the declared source evidence is allowed, but do
 not create a relationship that the evidence does not establish. Grammar, style,
 and language choice are irrelevant to this factual decision.
 
-Return only the requested structured response.
+Return only the requested structured response with fully_supported set to true or false.
 """.strip()

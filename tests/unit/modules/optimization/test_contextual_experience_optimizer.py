@@ -110,6 +110,14 @@ class FakeStructuredAIClient:
         return self.output
 
 
+class NoopTruthGate:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def validate(self, candidate, proposal) -> None:
+        self.calls.append((candidate, proposal))
+
+
 def test_jira_and_chamados_proposal_is_structurally_grounded() -> None:
     subject = candidate()
     matching_result = matching(((MatchStatus.MATCHED, (A,)), (MatchStatus.MATCHED, (B,))))
@@ -133,7 +141,9 @@ def test_jira_and_chamados_proposal_is_structurally_grounded() -> None:
         )
     )
 
-    proposal = AIContextualExperienceOptimizer(fake).optimize(subject, matching_result, plan)
+    proposal = AIContextualExperienceOptimizer(fake, NoopTruthGate()).optimize(
+        subject, matching_result, plan
+    )
 
     assert proposal == CandidateOptimizationProposal(
         (
@@ -169,7 +179,9 @@ def test_two_contexts_use_one_call_and_response_order_is_normalized() -> None:
         )
     )
 
-    proposal = AIContextualExperienceOptimizer(fake).optimize(candidate(), matching_result, plan)
+    proposal = AIContextualExperienceOptimizer(fake, NoopTruthGate()).optimize(
+        candidate(), matching_result, plan
+    )
 
     assert len(fake.calls) == 1
     assert [item.experience_index for item in proposal.experiences] == [2, 0]
@@ -182,7 +194,9 @@ def test_zero_experience_contexts_returns_empty_without_ai_call() -> None:
     )
 
     assert (
-        AIContextualExperienceOptimizer(fake).optimize(candidate(), MatchingResult(), plan)
+        AIContextualExperienceOptimizer(fake, NoopTruthGate()).optimize(
+            candidate(), MatchingResult(), plan
+        )
         == CandidateOptimizationProposal()
     )
     assert fake.calls == []
@@ -199,7 +213,9 @@ def test_payload_contains_only_context_evidence_and_context_criteria() -> None:
     plan = CandidateOptimizationPlan((ExperienceOptimizationContext(0, (1,), (B,)),))
     fake = FakeStructuredAIClient(response([{"experience_index": 0, "statements": []}]))
 
-    AIContextualExperienceOptimizer(fake).optimize(candidate(), matching_result, plan)
+    AIContextualExperienceOptimizer(fake, NoopTruthGate()).optimize(
+        candidate(), matching_result, plan
+    )
 
     payload = json.loads(fake.calls[0][1])
     encoded = fake.calls[0][1]
@@ -255,7 +271,9 @@ def test_invalid_response_provenance_or_context_set_is_rejected(items) -> None:
     fake = FakeStructuredAIClient(response(items))
 
     with pytest.raises(OptimizationProposalGroundingError):
-        AIContextualExperienceOptimizer(fake).optimize(candidate(), matching_result, plan)
+        AIContextualExperienceOptimizer(fake, NoopTruthGate()).optimize(
+            candidate(), matching_result, plan
+        )
 
 
 def test_empty_and_partial_statements_are_allowed() -> None:
@@ -283,7 +301,9 @@ def test_empty_and_partial_statements_are_allowed() -> None:
         )
     )
 
-    proposal = AIContextualExperienceOptimizer(fake).optimize(candidate(), matching_result, plan)
+    proposal = AIContextualExperienceOptimizer(fake, NoopTruthGate()).optimize(
+        candidate(), matching_result, plan
+    )
 
     assert proposal.experiences[0].statements[0].source_paths == (A, B)
     assert proposal.experiences[0].statements[0].target_match_indexes == (0, 1)
@@ -297,11 +317,11 @@ def test_invalid_plan_indexes_or_non_matches_fail_before_ai_call() -> None:
     invalid_status_plan = CandidateOptimizationPlan((ExperienceOptimizationContext(0, (0,), (A,)),))
 
     with pytest.raises(OptimizationProposalGroundingError):
-        AIContextualExperienceOptimizer(fake).optimize(
+        AIContextualExperienceOptimizer(fake, NoopTruthGate()).optimize(
             candidate(), valid_matching, invalid_index_plan
         )
     with pytest.raises(OptimizationProposalGroundingError):
-        AIContextualExperienceOptimizer(fake).optimize(
+        AIContextualExperienceOptimizer(fake, NoopTruthGate()).optimize(
             candidate(), non_matching, invalid_status_plan
         )
 
@@ -314,7 +334,7 @@ def test_inputs_are_immutable_and_prompt_declares_safety_contract() -> None:
     plan = CandidateOptimizationPlan((ExperienceOptimizationContext(0, (0,), (A,)),))
     fake = FakeStructuredAIClient(response([{"experience_index": 0, "statements": []}]))
 
-    AIContextualExperienceOptimizer(fake).optimize(subject, matching_result, plan)
+    AIContextualExperienceOptimizer(fake, NoopTruthGate()).optimize(subject, matching_result, plan)
 
     assert subject == candidate()
     assert matching_result == matching(((MatchStatus.MATCHED, (A,)),))
@@ -344,3 +364,45 @@ def test_proposal_contract_rejects_invalid_values() -> None:
         OptimizedExperienceStatementProposal("text", (A, A), (0,))
     with pytest.raises(DomainError):
         ExperienceOptimizationProposal(-1)
+
+
+def test_optimizer_validates_generated_proposal_before_returning_it() -> None:
+    subject = candidate()
+    matching_result = matching(((MatchStatus.MATCHED, (A,)),))
+    plan = CandidateOptimizationPlan((ExperienceOptimizationContext(0, (0,), (A,)),))
+    generated = response(
+        [
+            {
+                "experience_index": 0,
+                "statements": [
+                    {
+                        "text": "Proposta validável.",
+                        "source_paths": [A],
+                        "target_match_indexes": [0],
+                    }
+                ],
+            }
+        ]
+    )
+    truth_gate = NoopTruthGate()
+
+    result = AIContextualExperienceOptimizer(
+        FakeStructuredAIClient(generated), truth_gate
+    ).optimize(subject, matching_result, plan)
+
+    assert truth_gate.calls == [(subject, result)]
+    assert result.experiences[0].statements[0].text == "Proposta validável."
+
+
+def test_optimizer_propagates_truth_gate_failure_without_returning_proposal() -> None:
+    class FailingTruthGate:
+        def validate(self, candidate, proposal) -> None:
+            raise OptimizationProposalGroundingError()
+
+    generated = response([{"experience_index": 0, "statements": []}])
+    plan = CandidateOptimizationPlan((ExperienceOptimizationContext(0, (0,), (A,)),))
+
+    with pytest.raises(OptimizationProposalGroundingError):
+        AIContextualExperienceOptimizer(
+            FakeStructuredAIClient(generated), FailingTruthGate()
+        ).optimize(candidate(), matching(((MatchStatus.MATCHED, (A,)),)), plan)
