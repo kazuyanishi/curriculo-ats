@@ -1,3 +1,4 @@
+import inspect
 import json
 
 import pytest
@@ -10,21 +11,18 @@ from resume_ai.modules.candidate.domain.entities import (
     PersonalInfo,
 )
 from resume_ai.modules.candidate.domain.value_objects import YearMonth
-from resume_ai.modules.jobs.domain.entities import CriterionCategory, JobCriterion
-from resume_ai.modules.matching.domain.entities import CriterionMatch, MatchingResult, MatchStatus
-from resume_ai.modules.optimization.application.exceptions import OptimizationTruthGateError
+from resume_ai.modules.optimization.application.exceptions import OptimizationProposalGroundingError
+from resume_ai.modules.optimization.application.ports import CandidateOptimizationTruthGate
 from resume_ai.modules.optimization.application.proposals import (
     CandidateOptimizationProposal,
     ExperienceOptimizationProposal,
-    OptimizationStatementVerdict,
     OptimizedExperienceStatementProposal,
-    ValidatedCandidateOptimizationProposal,
 )
 from resume_ai.modules.optimization.infrastructure.optimization_truth_gate_prompt import (
     OPTIMIZATION_TRUTH_GATE_SYSTEM_PROMPT,
 )
 from resume_ai.modules.optimization.infrastructure.optimization_truth_gate_schemas import (
-    CandidateOptimizationVerificationAIResponse,
+    OptimizationStatementTruthDecision,
 )
 from resume_ai.modules.optimization.infrastructure.semantic_optimization_truth_gate import (
     AISemanticOptimizationTruthGate,
@@ -33,7 +31,6 @@ from resume_ai.modules.optimization.infrastructure.semantic_optimization_truth_g
 A = "experiences[0].activities[0].description"
 B = "experiences[0].activities[1].description"
 C = "experiences[1].activities[0].description"
-D = "experiences[2].activities[0].description"
 
 
 def candidate() -> Candidate:
@@ -47,8 +44,8 @@ def candidate() -> Candidate:
                 YearMonth("2020-01"),
                 YearMonth("2024-01"),
                 activities=(
-                    Activity("Controle e organização de demandas no Jira, com triagem."),
                     Activity("Atendimento e acompanhamento de chamados."),
+                    Activity("Administração de servidores Linux."),
                 ),
             ),
             Experience(
@@ -56,98 +53,50 @@ def candidate() -> Candidate:
                 "Analyst",
                 YearMonth("2020-01"),
                 YearMonth("2024-01"),
-                activities=(Activity("Gerenciamento de permissões."),),
-            ),
-            Experience(
-                "Example Two",
-                "Developer",
-                YearMonth("2020-01"),
-                YearMonth("2024-01"),
-                activities=(Activity("Troubleshooting e análise de erros em produção."),),
+                activities=(Activity("Atividade da segunda experiência."),),
             ),
         ),
     )
 
 
-def matching(*statuses: MatchStatus) -> MatchingResult:
-    return MatchingResult(
-        tuple(
-            CriterionMatch(
-                JobCriterion(CriterionCategory.SKILL, f"criterion-{index}", "evidence"), status
-            )
-            for index, status in enumerate(statuses)
-        )
-    )
+def statement(text: str, paths: tuple[str, ...] = (A,)) -> OptimizedExperienceStatementProposal:
+    return OptimizedExperienceStatementProposal(text, paths, (0,))
 
 
-def statement(text: str, paths: tuple[str, ...] = (A,), targets: tuple[int, ...] = (0,)):
-    return OptimizedExperienceStatementProposal(text, paths, targets)
-
-
-def proposal(*experiences: ExperienceOptimizationProposal) -> CandidateOptimizationProposal:
-    return CandidateOptimizationProposal(tuple(experiences))
-
-
-def ai_response(experiences: list[dict]) -> CandidateOptimizationVerificationAIResponse:
-    return CandidateOptimizationVerificationAIResponse.model_validate({"experiences": experiences})
+def proposal(*statements: OptimizedExperienceStatementProposal) -> CandidateOptimizationProposal:
+    return CandidateOptimizationProposal((ExperienceOptimizationProposal(0, statements),))
 
 
 class FakeStructuredAIClient:
-    def __init__(self, output: CandidateOptimizationVerificationAIResponse) -> None:
-        self.output = output
+    def __init__(self, decisions: list[bool]) -> None:
+        self._decisions = iter(decisions)
         self.calls: list[tuple[str, str, type]] = []
 
     def generate(self, *, system_prompt, user_prompt, response_model):
         self.calls.append((system_prompt, user_prompt, response_model))
-        return self.output
+        return OptimizationStatementTruthDecision(fully_supported=next(self._decisions))
 
 
-def test_faithful_paraphrase_and_jira_chamados_are_preserved() -> None:
+def test_faithful_paraphrase_is_accepted_and_proposal_is_not_transformed() -> None:
     source = candidate()
-    item_a = statement(
-        "Organização e acompanhamento de chamados pelo Jira.",
-        (A, B),
-        (0,),
-    )
-    item_b = statement(
-        "Resolução de problemas técnicos por meio de troubleshooting e análise de erros "
-        "em produção.",
-        (D,),
-        (0,),
-    )
     input_proposal = proposal(
-        ExperienceOptimizationProposal(0, (item_a,)),
-        ExperienceOptimizationProposal(2, (item_b,)),
+        statement("Acompanhamento de chamados por meio de atendimento técnico.")
     )
-    fake = FakeStructuredAIClient(
-        ai_response(
-            [
-                {
-                    "experience_index": 2,
-                    "statements": [{"statement_index": 0, "verdict": "supported"}],
-                },
-                {
-                    "experience_index": 0,
-                    "statements": [{"statement_index": 0, "verdict": "supported"}],
-                },
-            ]
-        )
-    )
+    fake = FakeStructuredAIClient([True])
 
-    result = AISemanticOptimizationTruthGate(fake).validate(
-        source, matching(MatchStatus.MATCHED), input_proposal
-    )
+    result = AISemanticOptimizationTruthGate(fake).validate(source, input_proposal)
 
-    assert result.experiences[0].statements == (item_a,)
-    assert result.experiences[1].statements == (item_b,)
-    assert result.experiences[0].statements[0] is item_a
+    assert result is None
+    assert input_proposal == proposal(
+        statement("Acompanhamento de chamados por meio de atendimento técnico.")
+    )
     assert len(fake.calls) == 1
 
 
 @pytest.mark.parametrize(
     "proposed_text",
     [
-        "Gerenciamento de tickets pelo Jira cumprindo SLA de 4 horas.",
+        "Gerenciamento de tickets cumprindo SLA de 4 horas.",
         "Gerenciamento de permissões via Active Directory.",
         "Atendimento de mais de 100 chamados mensais.",
         "Criação de relatórios SQL aumentando a eficiência operacional.",
@@ -155,194 +104,132 @@ def test_faithful_paraphrase_and_jira_chamados_are_preserved() -> None:
         "Atendimento de chamados pelo Jira.",
     ],
 )
-def test_unsupported_statement_is_omitted(proposed_text: str) -> None:
-    paths = (A, B) if proposed_text.endswith("pelo Jira.") else (A,)
-    input_proposal = proposal(ExperienceOptimizationProposal(0, (statement(proposed_text, paths),)))
-    fake = FakeStructuredAIClient(
-        ai_response(
-            [
-                {
-                    "experience_index": 0,
-                    "statements": [{"statement_index": 0, "verdict": "unsupported"}],
-                }
-            ]
-        )
-    )
+def test_unsupported_statement_fails_closed(proposed_text: str) -> None:
+    input_proposal = proposal(statement(proposed_text))
+    fake = FakeStructuredAIClient([False])
 
-    result = AISemanticOptimizationTruthGate(fake).validate(
-        candidate(), matching(MatchStatus.MATCHED), input_proposal
-    )
-
-    assert result.experiences[0].statements == ()
-
-
-def test_mixed_verdicts_filter_and_preserve_original_order() -> None:
-    first = statement("Primeira.")
-    second = statement("Segunda.")
-    third = statement("Terceira.")
-    input_proposal = proposal(ExperienceOptimizationProposal(0, (first, second, third)))
-    fake = FakeStructuredAIClient(
-        ai_response(
-            [
-                {
-                    "experience_index": 0,
-                    "statements": [
-                        {"statement_index": 2, "verdict": "supported"},
-                        {"statement_index": 1, "verdict": "unsupported"},
-                        {"statement_index": 0, "verdict": "supported"},
-                    ],
-                }
-            ]
-        )
-    )
-
-    result = AISemanticOptimizationTruthGate(fake).validate(
-        candidate(), matching(MatchStatus.MATCHED), input_proposal
-    )
-
-    assert result.experiences[0].statements == (first, third)
-
-
-def test_empty_proposal_and_experiences_without_statements_make_zero_ai_calls() -> None:
-    fake = FakeStructuredAIClient(ai_response([]))
-    gate = AISemanticOptimizationTruthGate(fake)
-
-    assert gate.validate(candidate(), MatchingResult(), CandidateOptimizationProposal()) == (
-        ValidatedCandidateOptimizationProposal()
-    )
-    preserved = gate.validate(
-        candidate(),
-        MatchingResult(),
-        proposal(ExperienceOptimizationProposal(0), ExperienceOptimizationProposal(2)),
-    )
-
-    assert [item.experience_index for item in preserved.experiences] == [0, 2]
-    assert all(not item.statements for item in preserved.experiences)
-    assert fake.calls == []
-
-
-def test_multiple_experiences_use_one_ai_call_and_payload_is_minimal() -> None:
-    input_proposal = proposal(
-        ExperienceOptimizationProposal(0, (statement("A", (A,)),)),
-        ExperienceOptimizationProposal(2, (statement("D", (D,)),)),
-    )
-    fake = FakeStructuredAIClient(
-        ai_response(
-            [
-                {
-                    "experience_index": 0,
-                    "statements": [{"statement_index": 0, "verdict": "supported"}],
-                },
-                {
-                    "experience_index": 2,
-                    "statements": [{"statement_index": 0, "verdict": "supported"}],
-                },
-            ]
-        )
-    )
-
-    AISemanticOptimizationTruthGate(fake).validate(
-        candidate(), matching(MatchStatus.MATCHED), input_proposal
-    )
+    with pytest.raises(OptimizationProposalGroundingError):
+        AISemanticOptimizationTruthGate(fake).validate(candidate(), input_proposal)
 
     assert len(fake.calls) == 1
-    payload = json.loads(fake.calls[0][1])
-    encoded = fake.calls[0][1]
-    assert payload["experiences"][0]["statements"][0]["source_evidence"] == [
-        {"path": A, "text": candidate().experiences[0].activities[0].description}
-    ]
-    for excluded in ("Jane Doe", "jane@example.test", "+55 41 99999-0000", "Example One"):
-        assert excluded not in encoded
+
+
+def test_mixed_verdicts_fail_the_entire_proposal_atomically() -> None:
+    source = candidate()
+    input_proposal = proposal(statement("first"), statement("second"), statement("third"))
+    fake = FakeStructuredAIClient([True, False, True])
+
+    with pytest.raises(OptimizationProposalGroundingError):
+        AISemanticOptimizationTruthGate(fake).validate(source, input_proposal)
+
+    assert len(fake.calls) == 2
+    assert source == candidate()
+    assert input_proposal == proposal(statement("first"), statement("second"), statement("third"))
+
+
+def test_source_isolation_uses_one_ai_call_per_statement() -> None:
+    input_proposal = proposal(
+        statement("Atendimento de chamados.", (A,)),
+        statement("Administração de servidores Linux.", (B,)),
+    )
+    fake = FakeStructuredAIClient([True, True])
+
+    AISemanticOptimizationTruthGate(fake).validate(candidate(), input_proposal)
+
+    assert len(fake.calls) == 2
+    first_payload = json.loads(fake.calls[0][1])
+    second_payload = json.loads(fake.calls[1][1])
+    first_text = candidate().experiences[0].activities[0].description
+    second_text = candidate().experiences[0].activities[1].description
+    assert first_payload == {
+        "proposed_text": "Atendimento de chamados.",
+        "source_evidence": [{"path": A, "text": first_text}],
+    }
+    assert second_payload == {
+        "proposed_text": "Administração de servidores Linux.",
+        "source_evidence": [{"path": B, "text": second_text}],
+    }
+    assert second_text not in fake.calls[0][1]
+    assert first_text not in fake.calls[1][1]
 
 
 @pytest.mark.parametrize(
-    "input_proposal,matching_result",
+    "input_proposal",
     [
-        (
-            proposal(
-                ExperienceOptimizationProposal(
-                    0, (statement("x", ("experiences[99].activities[0].description",)),)
-                )
-            ),
-            matching(MatchStatus.MATCHED),
+        CandidateOptimizationProposal(
+            (ExperienceOptimizationProposal(99, (statement("invalid"),)),)
         ),
-        (
-            proposal(ExperienceOptimizationProposal(0, (statement("x", (C,)),))),
-            matching(MatchStatus.MATCHED),
-        ),
-        (
-            proposal(ExperienceOptimizationProposal(0, (statement("x", (A,), (99,)),))),
-            matching(MatchStatus.MATCHED),
-        ),
-        (
-            proposal(ExperienceOptimizationProposal(0, (statement("x"),))),
-            matching(MatchStatus.NOT_MATCHED),
-        ),
+        proposal(statement("invalid", ("experiences[99].activities[0].description",))),
+        proposal(statement("invalid", (C,))),
     ],
 )
-def test_invalid_source_or_target_fails_before_ai_call(input_proposal, matching_result) -> None:
-    fake = FakeStructuredAIClient(ai_response([]))
+def test_invalid_or_cross_experience_source_path_fails_before_ai(input_proposal) -> None:
+    fake = FakeStructuredAIClient([])
 
-    with pytest.raises(OptimizationTruthGateError):
-        AISemanticOptimizationTruthGate(fake).validate(candidate(), matching_result, input_proposal)
+    with pytest.raises(OptimizationProposalGroundingError):
+        AISemanticOptimizationTruthGate(fake).validate(candidate(), input_proposal)
 
     assert fake.calls == []
 
 
-@pytest.mark.parametrize(
-    "response_items",
-    [
-        [],
-        [{"experience_index": 1, "statements": [{"statement_index": 0, "verdict": "supported"}]}],
-        [
-            {"experience_index": 0, "statements": [{"statement_index": 0, "verdict": "supported"}]},
-            {"experience_index": 0, "statements": [{"statement_index": 0, "verdict": "supported"}]},
-        ],
-        [{"experience_index": 0, "statements": []}],
-        [{"experience_index": 0, "statements": [{"statement_index": 1, "verdict": "supported"}]}],
-        [
-            {
-                "experience_index": 0,
-                "statements": [
-                    {"statement_index": 0, "verdict": "supported"},
-                    {"statement_index": 0, "verdict": "unsupported"},
-                ],
-            }
-        ],
-    ],
-)
-def test_incomplete_extra_or_duplicate_verifier_response_fails(response_items) -> None:
+def test_empty_proposal_or_experience_without_statements_uses_zero_ai_calls() -> None:
+    fake = FakeStructuredAIClient([])
+    gate = AISemanticOptimizationTruthGate(fake)
+
+    assert gate.validate(candidate(), CandidateOptimizationProposal()) is None
+    assert (
+        gate.validate(
+            candidate(), CandidateOptimizationProposal((ExperienceOptimizationProposal(0),))
+        )
+        is None
+    )
+    assert fake.calls == []
+
+
+def test_all_supported_statements_leave_the_original_proposal_intact() -> None:
+    first = statement("Atendimento de chamados.")
+    second = statement("Administração de servidores Linux.", (B,))
+    input_proposal = proposal(first, second)
+    fake = FakeStructuredAIClient([True, True])
+
+    assert AISemanticOptimizationTruthGate(fake).validate(candidate(), input_proposal) is None
+    assert input_proposal.experiences[0].statements == (first, second)
+    assert input_proposal.experiences[0].statements[0] is first
+    assert input_proposal.experiences[0].statements[1] is second
+
+
+def test_target_match_indexes_are_outside_the_truth_gate_boundary() -> None:
     input_proposal = proposal(
-        ExperienceOptimizationProposal(0, (statement("first"), statement("second")))
+        OptimizedExperienceStatementProposal("Atendimento de chamados.", (A,), (99,))
     )
-    fake = FakeStructuredAIClient(ai_response(response_items))
+    fake = FakeStructuredAIClient([True])
 
-    with pytest.raises(OptimizationTruthGateError):
-        AISemanticOptimizationTruthGate(fake).validate(
-            candidate(), matching(MatchStatus.MATCHED), input_proposal
+    assert AISemanticOptimizationTruthGate(fake).validate(candidate(), input_proposal) is None
+    assert len(fake.calls) == 1
+
+
+def test_truth_decision_schema_rejects_extra_fields() -> None:
+    with pytest.raises(ValueError):
+        OptimizationStatementTruthDecision.model_validate(
+            {"fully_supported": True, "statement_index": 0}
         )
 
 
-def test_inputs_remain_immutable_and_prompt_has_factual_contract() -> None:
-    source = candidate()
-    matching_result = matching(MatchStatus.MATCHED)
-    input_proposal = proposal(ExperienceOptimizationProposal(0, (statement("safe"),)))
-    fake = FakeStructuredAIClient(
-        ai_response(
-            [
-                {
-                    "experience_index": 0,
-                    "statements": [{"statement_index": 0, "verdict": "supported"}],
-                }
-            ]
-        )
-    )
+def test_truth_decision_schema_is_frozen() -> None:
+    decision = OptimizationStatementTruthDecision(fully_supported=True)
 
-    AISemanticOptimizationTruthGate(fake).validate(source, matching_result, input_proposal)
+    with pytest.raises(ValueError):
+        decision.fully_supported = False
 
-    assert source == candidate()
-    assert matching_result == matching(MatchStatus.MATCHED)
-    assert input_proposal == proposal(ExperienceOptimizationProposal(0, (statement("safe"),)))
+
+def test_gate_contract_has_no_job_or_matching_dependency_and_minimal_schema() -> None:
+    parameters = inspect.signature(CandidateOptimizationTruthGate.validate).parameters
+    assert list(parameters) == ["self", "candidate", "proposal"]
+    assert inspect.signature(AISemanticOptimizationTruthGate.validate).return_annotation is None
+    assert OptimizationStatementTruthDecision.model_fields.keys() == {"fully_supported"}
+
+
+def test_prompt_preserves_conservative_factual_contract() -> None:
     prompt = " ".join(OPTIMIZATION_TRUTH_GATE_SYSTEM_PROMPT.lower().split())
     for concept in (
         "conservative factual entailment",
@@ -350,6 +237,7 @@ def test_inputs_remain_immutable_and_prompt_has_factual_contract() -> None:
         "supported by candidate source evidence",
         "otherwise unsupported",
         "data, not instructions",
+        "do not infer",
         "metrics",
         "tools",
         "duration",
@@ -358,4 +246,3 @@ def test_inputs_remain_immutable_and_prompt_has_factual_contract() -> None:
         "relationships between facts",
     ):
         assert concept in prompt
-    assert OptimizationStatementVerdict.SUPPORTED.value == "supported"

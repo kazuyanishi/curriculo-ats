@@ -7,6 +7,7 @@ from resume_ai.modules.matching.application.provenance import MatchingProvenance
 from resume_ai.modules.matching.domain.entities import MatchingResult, MatchStatus
 from resume_ai.modules.optimization.application.exceptions import OptimizationProposalGroundingError
 from resume_ai.modules.optimization.application.planning import CandidateOptimizationPlan
+from resume_ai.modules.optimization.application.ports import CandidateOptimizationTruthGate
 from resume_ai.modules.optimization.application.proposals import (
     CandidateOptimizationProposal,
     ExperienceOptimizationProposal,
@@ -21,8 +22,13 @@ from resume_ai.modules.optimization.infrastructure.contextual_experience_schemas
 
 
 class AIContextualExperienceOptimizer:
-    def __init__(self, client: StructuredAIClient) -> None:
+    def __init__(
+        self,
+        client: StructuredAIClient,
+        truth_gate: CandidateOptimizationTruthGate,
+    ) -> None:
         self._client = client
+        self._truth_gate = truth_gate
 
     def optimize(
         self,
@@ -31,7 +37,9 @@ class AIContextualExperienceOptimizer:
         plan: CandidateOptimizationPlan,
     ) -> CandidateOptimizationProposal:
         if not plan.experience_contexts:
-            return CandidateOptimizationProposal()
+            proposal = CandidateOptimizationProposal()
+            self._truth_gate.validate(candidate, proposal)
+            return proposal
 
         MatchingProvenanceGate().validate(candidate, matching)
         catalog = {item.path: item.text for item in build_candidate_evidence_catalog(candidate)}
@@ -41,7 +49,9 @@ class AIContextualExperienceOptimizer:
             user_prompt=json.dumps(payload, ensure_ascii=False),
             response_model=CandidateOptimizationAIResponse,
         )
-        return self._proposal(plan, response)
+        proposal = self._proposal(plan, response)
+        self._truth_gate.validate(candidate, proposal)
+        return proposal
 
     @staticmethod
     def _payload(
