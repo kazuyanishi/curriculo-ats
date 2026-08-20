@@ -21,3 +21,11 @@ class CandidateOptimizationTruthGate(Protocol):
         candidate: Candidate,
         proposal: CandidateOptimizationProposal,
     ) -> None: ...
+
+
+class CandidateOptimizationProposalApplier(Protocol):
+    def apply(
+        self,
+        candidate: Candidate,
+        proposal: CandidateOptimizationProposal,
+    ) -> Candidate: ...

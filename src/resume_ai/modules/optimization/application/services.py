@@ -1,6 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
-from resume_ai.modules.candidate.domain.entities import Candidate
+from resume_ai.modules.candidate.domain.entities import Activity, Candidate
 from resume_ai.modules.jobs.application.services import ExtractJobCriteria
 from resume_ai.modules.jobs.domain.entities import JobCriteria, JobPosting
 from resume_ai.modules.matching.application.services import (
@@ -12,7 +12,52 @@ from resume_ai.modules.matching.domain.entities import (
     MatchingResult,
     MatchingScore,
 )
+from resume_ai.modules.optimization.application.exceptions import OptimizationProposalGroundingError
+from resume_ai.modules.optimization.application.proposals import (
+    CandidateOptimizationProposal,
+    OptimizedExperienceStatementProposal,
+)
 from resume_ai.modules.optimization.domain.services import DeterministicCandidateOptimizer
+
+
+class DeterministicCandidateOptimizationProposalApplier:
+    def apply(
+        self,
+        candidate: Candidate,
+        proposal: CandidateOptimizationProposal,
+    ) -> Candidate:
+        by_experience_index = self._by_experience_index(candidate, proposal)
+        if not by_experience_index:
+            return candidate
+
+        experiences = tuple(
+            replace(
+                experience,
+                activities=tuple(
+                    Activity(statement.text) for statement in by_experience_index[index]
+                ),
+            )
+            if index in by_experience_index
+            else experience
+            for index, experience in enumerate(candidate.experiences)
+        )
+        return replace(candidate, experiences=experiences)
+
+    @staticmethod
+    def _by_experience_index(
+        candidate: Candidate,
+        proposal: CandidateOptimizationProposal,
+    ) -> dict[int, tuple[OptimizedExperienceStatementProposal, ...]]:
+        by_experience_index: dict[int, tuple[OptimizedExperienceStatementProposal, ...]] = {}
+        seen_indexes: set[int] = set()
+        for experience_proposal in proposal.experiences:
+            index = experience_proposal.experience_index
+            if not 0 <= index < len(candidate.experiences) or index in seen_indexes:
+                raise OptimizationProposalGroundingError()
+            seen_indexes.add(index)
+            if experience_proposal.statements:
+                by_experience_index[index] = experience_proposal.statements
+        return by_experience_index
 
 
 class OptimizeCandidate:
