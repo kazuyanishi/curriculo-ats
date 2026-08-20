@@ -4,6 +4,7 @@ import pytest
 
 from resume_ai.core.exceptions import DomainError
 from resume_ai.modules.candidate.domain.entities import (
+    Achievement,
     Activity,
     Candidate,
     ContactInfo,
@@ -43,6 +44,7 @@ def candidate() -> Candidate:
                     "Atendimento e acompanhamento de chamados por telefone, e-mail e service desk."
                 ),
             ),
+            achievements=(Achievement("Redução de tempo de atendimento."),),
         )
         for index in range(3)
     )
@@ -119,6 +121,43 @@ def test_multi_experience_and_experience_technology_matches_stay_standalone() ->
         StandaloneOptimizationContext(0, (first, second)),
         StandaloneOptimizationContext(1, (first, technology)),
     )
+
+
+@pytest.mark.parametrize(
+    ("paths", "is_experience_context"),
+    [
+        (("experiences[0].activities[0].description",), True),
+        (
+            (
+                "experiences[0].activities[0].description",
+                "experiences[0].activities[1].description",
+            ),
+            True,
+        ),
+        (("experiences[0].role",), False),
+        (("experiences[0].achievements[0].description",), False),
+        (("experiences[0].activities[0].description", "experiences[0].role"), False),
+        (
+            (
+                "experiences[0].activities[0].description",
+                "experiences[1].activities[0].description",
+            ),
+            False,
+        ),
+    ],
+)
+def test_only_activity_description_paths_build_experience_contexts(
+    paths: tuple[str, ...],
+    is_experience_context: bool,
+) -> None:
+    plan = planner().execute(candidate(), MatchingResult((match(MatchStatus.MATCHED, *paths),)))
+
+    if is_experience_context:
+        assert plan.experience_contexts[0].evidence_paths == paths
+        assert plan.standalone_contexts == ()
+    else:
+        assert plan.experience_contexts == ()
+        assert plan.standalone_contexts == (StandaloneOptimizationContext(0, paths),)
 
 
 def test_technology_and_education_matches_stay_standalone() -> None:

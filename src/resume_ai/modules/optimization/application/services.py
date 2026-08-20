@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass, replace
 
 from resume_ai.modules.candidate.domain.entities import Activity, Candidate
@@ -25,6 +26,8 @@ from resume_ai.modules.optimization.application.proposals import (
 )
 from resume_ai.modules.optimization.domain.services import DeterministicCandidateOptimizer
 
+_ACTIVITY_PATH = re.compile(r"^experiences\[(\d+)]\.activities\[(\d+)]\.description$")
+
 
 class DeterministicCandidateOptimizationProposalApplier:
     def apply(
@@ -39,8 +42,8 @@ class DeterministicCandidateOptimizationProposalApplier:
         experiences = tuple(
             replace(
                 experience,
-                activities=tuple(
-                    Activity(statement.text) for statement in by_experience_index[index]
+                activities=self._apply_activities(
+                    experience.activities, by_experience_index[index]
                 ),
             )
             if index in by_experience_index
@@ -53,8 +56,10 @@ class DeterministicCandidateOptimizationProposalApplier:
     def _by_experience_index(
         candidate: Candidate,
         proposal: CandidateOptimizationProposal,
-    ) -> dict[int, tuple[OptimizedExperienceStatementProposal, ...]]:
-        by_experience_index: dict[int, tuple[OptimizedExperienceStatementProposal, ...]] = {}
+    ) -> dict[int, tuple[tuple[int, frozenset[int], OptimizedExperienceStatementProposal], ...]]:
+        by_experience_index: dict[
+            int, tuple[tuple[int, frozenset[int], OptimizedExperienceStatementProposal], ...]
+        ] = {}
         seen_indexes: set[int] = set()
         for experience_proposal in proposal.experiences:
             index = experience_proposal.experience_index
@@ -62,8 +67,56 @@ class DeterministicCandidateOptimizationProposalApplier:
                 raise OptimizationProposalGroundingError()
             seen_indexes.add(index)
             if experience_proposal.statements:
-                by_experience_index[index] = experience_proposal.statements
+                consumed: set[int] = set()
+                replacements = []
+                for statement in experience_proposal.statements:
+                    activity_indexes = (
+                        DeterministicCandidateOptimizationProposalApplier._activity_indexes(
+                            candidate, index, statement
+                        )
+                    )
+                    if consumed.intersection(activity_indexes):
+                        raise OptimizationProposalGroundingError()
+                    consumed.update(activity_indexes)
+                    replacements.append((min(activity_indexes), activity_indexes, statement))
+                by_experience_index[index] = tuple(replacements)
         return by_experience_index
+
+    @staticmethod
+    def _activity_indexes(
+        candidate: Candidate,
+        experience_index: int,
+        statement: OptimizedExperienceStatementProposal,
+    ) -> frozenset[int]:
+        indexes = set()
+        for path in statement.source_paths:
+            match = _ACTIVITY_PATH.fullmatch(path)
+            if match is None or int(match.group(1)) != experience_index:
+                raise OptimizationProposalGroundingError()
+            activity_index = int(match.group(2))
+            if not 0 <= activity_index < len(candidate.experiences[experience_index].activities):
+                raise OptimizationProposalGroundingError()
+            indexes.add(activity_index)
+        return frozenset(indexes)
+
+    @staticmethod
+    def _apply_activities(
+        activities: tuple[Activity, ...],
+        replacements: tuple[tuple[int, frozenset[int], OptimizedExperienceStatementProposal], ...],
+    ) -> tuple[Activity, ...]:
+        statements_by_first_index = {index: statement for index, _, statement in replacements}
+        consumed_indexes = {
+            activity_index
+            for _, activity_indexes, _ in replacements
+            for activity_index in activity_indexes
+        }
+        return tuple(
+            Activity(statements_by_first_index[index].text)
+            if index in statements_by_first_index
+            else activity
+            for index, activity in enumerate(activities)
+            if index not in consumed_indexes or index in statements_by_first_index
+        )
 
 
 class GroundedCandidateOptimizer:

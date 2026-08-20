@@ -1,4 +1,5 @@
 import json
+import re
 
 from resume_ai.integrations.ai.client import StructuredAIClient
 from resume_ai.modules.candidate.domain.entities import Candidate
@@ -19,6 +20,8 @@ from resume_ai.modules.optimization.infrastructure.contextual_experience_prompt 
 from resume_ai.modules.optimization.infrastructure.contextual_experience_schemas import (
     CandidateOptimizationAIResponse,
 )
+
+_ACTIVITY_PATH = re.compile(r"^experiences\[(\d+)]\.activities\[(\d+)]\.description$")
 
 
 class AIContextualExperienceOptimizer:
@@ -61,6 +64,12 @@ class AIContextualExperienceOptimizer:
     ) -> dict[str, object]:
         contexts = []
         for context in plan.experience_contexts:
+            if any(
+                (match := _ACTIVITY_PATH.fullmatch(path)) is None
+                or int(match.group(1)) != context.experience_index
+                for path in context.evidence_paths
+            ):
+                raise OptimizationProposalGroundingError()
             criteria = []
             for match_index in context.match_indexes:
                 if not 0 <= match_index < len(matching.matches):
