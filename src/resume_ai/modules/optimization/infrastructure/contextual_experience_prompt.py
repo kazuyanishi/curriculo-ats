@@ -14,4 +14,10 @@ Return only the requested structured response. For every proposed statement,
 return exact source_paths copied from the provided candidate evidence and
 target_match_indexes copied from the provided context. A statement may be omitted
 when no safe rewrite can be proposed.
+
+Every target_match_index must be connected to at least one declared source_path
+through that criterion's candidate_evidence_paths. Every declared source_path
+must belong to at least one declared target_match_index. Do not associate
+evidence with a different criterion merely because both are in the same
+experience context.
 """.strip()

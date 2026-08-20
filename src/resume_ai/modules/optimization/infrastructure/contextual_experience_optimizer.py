@@ -7,7 +7,10 @@ from resume_ai.modules.matching.application.catalog import build_candidate_evide
 from resume_ai.modules.matching.application.provenance import MatchingProvenanceGate
 from resume_ai.modules.matching.domain.entities import MatchingResult, MatchStatus
 from resume_ai.modules.optimization.application.exceptions import OptimizationProposalGroundingError
-from resume_ai.modules.optimization.application.planning import CandidateOptimizationPlan
+from resume_ai.modules.optimization.application.planning import (
+    CandidateOptimizationPlan,
+    ExperienceOptimizationContext,
+)
 from resume_ai.modules.optimization.application.ports import CandidateOptimizationTruthGate
 from resume_ai.modules.optimization.application.proposals import (
     CandidateOptimizationProposal,
@@ -52,7 +55,7 @@ class AIContextualExperienceOptimizer:
             user_prompt=json.dumps(payload, ensure_ascii=False),
             response_model=CandidateOptimizationAIResponse,
         )
-        proposal = self._proposal(plan, response)
+        proposal = self._proposal(plan, matching, response)
         self._truth_gate.validate(candidate, proposal)
         return proposal
 
@@ -85,6 +88,7 @@ class AIContextualExperienceOptimizer:
                         "value": criterion.value,
                         "evidence": criterion.evidence,
                         "importance": criterion.importance.value,
+                        "candidate_evidence_paths": list(match.candidate_evidence_paths),
                     }
                 )
             try:
@@ -105,6 +109,7 @@ class AIContextualExperienceOptimizer:
     @staticmethod
     def _proposal(
         plan: CandidateOptimizationPlan,
+        matching: MatchingResult,
         response: CandidateOptimizationAIResponse,
     ) -> CandidateOptimizationProposal:
         expected = [context.experience_index for context in plan.experience_contexts]
@@ -120,6 +125,9 @@ class AIContextualExperienceOptimizer:
                     raise OptimizationProposalGroundingError()
                 if not set(statement.target_match_indexes).issubset(context.match_indexes):
                     raise OptimizationProposalGroundingError()
+                AIContextualExperienceOptimizer._validate_source_target_binding(
+                    matching, context, statement.source_paths, statement.target_match_indexes
+                )
                 statements.append(
                     OptimizedExperienceStatementProposal(
                         text=statement.text,
@@ -131,3 +139,26 @@ class AIContextualExperienceOptimizer:
                 ExperienceOptimizationProposal(context.experience_index, tuple(statements))
             )
         return CandidateOptimizationProposal(tuple(proposals))
+
+    @staticmethod
+    def _validate_source_target_binding(
+        matching: MatchingResult,
+        context: ExperienceOptimizationContext,
+        source_paths: tuple[str, ...],
+        target_match_indexes: tuple[int, ...],
+    ) -> None:
+        target_paths: set[str] = set()
+        for target_match_index in target_match_indexes:
+            if not 0 <= target_match_index < len(matching.matches):
+                raise OptimizationProposalGroundingError()
+            if target_match_index not in context.match_indexes:
+                raise OptimizationProposalGroundingError()
+            match = matching.matches[target_match_index]
+            if match.status is not MatchStatus.MATCHED or not match.candidate_evidence_paths:
+                raise OptimizationProposalGroundingError()
+            paths = set(match.candidate_evidence_paths)
+            if not set(source_paths).intersection(paths):
+                raise OptimizationProposalGroundingError()
+            target_paths.update(paths)
+        if not set(source_paths).issubset(target_paths):
+            raise OptimizationProposalGroundingError()
