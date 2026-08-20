@@ -4,6 +4,7 @@ import pytest
 
 from resume_ai.core.exceptions import DomainError
 from resume_ai.modules.candidate.domain.entities import (
+    Achievement,
     Activity,
     Candidate,
     ContactInfo,
@@ -62,6 +63,7 @@ def candidate() -> Candidate:
                         "service desk."
                     ),
                 ),
+                achievements=(Achievement("Redução de tempo de atendimento."),),
             ),
             Experience(
                 "Example One",
@@ -323,6 +325,22 @@ def test_invalid_plan_indexes_or_non_matches_fail_before_ai_call() -> None:
     with pytest.raises(OptimizationProposalGroundingError):
         AIContextualExperienceOptimizer(fake, NoopTruthGate()).optimize(
             candidate(), non_matching, invalid_status_plan
+        )
+
+    assert fake.calls == []
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["experiences[0].achievements[0].description", "experiences[0].role"],
+)
+def test_non_activity_experience_context_fails_before_ai_call(path: str) -> None:
+    fake = FakeStructuredAIClient(response([]))
+    plan = CandidateOptimizationPlan((ExperienceOptimizationContext(0, (0,), (path,)),))
+
+    with pytest.raises(OptimizationProposalGroundingError):
+        AIContextualExperienceOptimizer(fake, NoopTruthGate()).optimize(
+            candidate(), MatchingResult(), plan
         )
 
     assert fake.calls == []

@@ -44,23 +44,17 @@ def candidate() -> Candidate:
                 "Support Analyst",
                 YearMonth("2020-01"),
                 YearMonth("2024-01"),
-                activities=(Activity("Atendimento de chamados."), Activity("Organização no Jira.")),
-                achievements=(Achievement("Melhoria de processo."),),
+                activities=(Activity("A"), Activity("X"), Activity("B"), Activity("Y")),
+                achievements=(Achievement("Achievement"),),
             ),
             Experience(
                 "Example One",
                 "Developer",
                 YearMonth("2021-01"),
-                activities=(Activity("Desenvolvimento Python."),),
-            ),
-            Experience(
-                "Example Two",
-                "Analyst",
-                YearMonth("2022-01"),
-                activities=(Activity("Análise de dados."),),
+                activities=(Activity("Other"),),
             ),
         ),
-        education=(Education("Example University", "Computer Science", EducationStatus.COMPLETED),),
+        education=(Education("University", "Computer Science", EducationStatus.COMPLETED),),
         skills=(Skill("Communication"),),
         technologies=(Technology("Python"),),
         tools=(Tool("Jira"),),
@@ -70,99 +64,92 @@ def candidate() -> Candidate:
     )
 
 
-def statement(text: str) -> OptimizedExperienceStatementProposal:
+def statement(
+    text: str,
+    indexes: tuple[int, ...] = (0,),
+    experience_index: int = 0,
+) -> OptimizedExperienceStatementProposal:
     return OptimizedExperienceStatementProposal(
         text,
-        ("experiences[0].activities[0].description",),
+        tuple(
+            f"experiences[{experience_index}].activities[{index}].description" for index in indexes
+        ),
         (0,),
     )
 
 
-def proposal(*items: ExperienceOptimizationProposal) -> CandidateOptimizationProposal:
-    return CandidateOptimizationProposal(items)
+def apply(source: Candidate, proposal: CandidateOptimizationProposal) -> Candidate:
+    return DeterministicCandidateOptimizationProposalApplier().apply(source, proposal)
 
 
-def apply(source: Candidate, input_proposal: CandidateOptimizationProposal) -> Candidate:
-    return DeterministicCandidateOptimizationProposalApplier().apply(source, input_proposal)
-
-
-def test_empty_proposal_returns_the_original_candidate() -> None:
+def test_empty_proposal_and_empty_statements_preserve_original_candidate() -> None:
     source = candidate()
 
     assert apply(source, CandidateOptimizationProposal()) is source
+    assert (
+        apply(source, CandidateOptimizationProposal((ExperienceOptimizationProposal(0),))) is source
+    )
 
 
-def test_experience_with_empty_statements_preserves_its_activities() -> None:
+def test_replaces_only_the_referenced_activity() -> None:
     source = candidate()
-    input_proposal = proposal(ExperienceOptimizationProposal(0))
+    proposal = CandidateOptimizationProposal(
+        (ExperienceOptimizationProposal(0, (statement("BX", (2,)),)),)
+    )
 
-    result = apply(source, input_proposal)
-
-    assert result is source
-    assert result.experiences[0].activities is source.experiences[0].activities
-
-
-def test_applies_one_experience_by_replacing_only_activities() -> None:
-    source = candidate()
-    input_proposal = proposal(ExperienceOptimizationProposal(0, (statement("Chamados via Jira."),)))
-
-    result = apply(source, input_proposal)
-
-    optimized = result.experiences[0]
-    original = source.experiences[0]
-    assert result is not source
-    assert optimized.activities == (Activity("Chamados via Jira."),)
-    assert optimized.company == original.company
-    assert optimized.role == original.role
-    assert optimized.start_date is original.start_date
-    assert optimized.end_date is original.end_date
-    assert optimized.achievements is original.achievements
-
-
-def test_preserves_statement_order_and_duplicates() -> None:
-    source = candidate()
-    first = statement("Primeiro.")
-    second = statement("Segundo.")
-    duplicate = statement("Primeiro.")
-
-    result = apply(source, proposal(ExperienceOptimizationProposal(0, (first, second, duplicate))))
+    result = apply(source, proposal)
 
     assert tuple(item.description for item in result.experiences[0].activities) == (
-        "Primeiro.",
-        "Segundo.",
-        "Primeiro.",
+        "A",
+        "X",
+        "BX",
+        "Y",
     )
+    assert result.experiences[0].achievements is source.experiences[0].achievements
 
 
-def test_multiple_experiences_apply_at_indexes_without_reordering_candidate() -> None:
+def test_combined_activities_are_inserted_at_the_smallest_original_index() -> None:
     source = candidate()
-    input_proposal = proposal(
-        ExperienceOptimizationProposal(2, (statement("Experiência dois."),)),
-        ExperienceOptimizationProposal(0, (statement("Experiência zero."),)),
+    proposal = CandidateOptimizationProposal(
+        (ExperienceOptimizationProposal(0, (statement("AB", (0, 2)),)),)
     )
 
-    result = apply(source, input_proposal)
+    result = apply(source, proposal)
 
-    assert [item.company for item in result.experiences] == [
-        "Example Zero",
-        "Example One",
-        "Example Two",
-    ]
-    assert result.experiences[0].activities == (Activity("Experiência zero."),)
-    assert result.experiences[2].activities == (Activity("Experiência dois."),)
+    assert tuple(item.description for item in result.experiences[0].activities) == ("AB", "X", "Y")
+
+
+def test_proposal_order_does_not_reorder_independent_activities() -> None:
+    source = candidate()
+    proposal = CandidateOptimizationProposal(
+        (ExperienceOptimizationProposal(0, (statement("B2", (2,)), statement("A0", (0,)))),)
+    )
+
+    result = apply(source, proposal)
+
+    assert tuple(item.description for item in result.experiences[0].activities) == (
+        "A0",
+        "X",
+        "B2",
+        "Y",
+    )
+
+
+def test_omitted_activities_and_unmentioned_experiences_are_shared() -> None:
+    source = candidate()
+    proposal = CandidateOptimizationProposal(
+        (ExperienceOptimizationProposal(0, (statement("A0"),)),)
+    )
+
+    result = apply(source, proposal)
+
+    assert tuple(item.description for item in result.experiences[0].activities) == (
+        "A0",
+        "X",
+        "B",
+        "Y",
+    )
     assert result.experiences[1] is source.experiences[1]
-
-
-def test_unmentioned_experiences_and_other_candidate_sections_are_shared() -> None:
-    source = candidate()
-
-    result = apply(source, proposal(ExperienceOptimizationProposal(1, (statement("Novo texto."),))))
-
-    assert result.experiences[0] is source.experiences[0]
-    assert result.experiences[2] is source.experiences[2]
-    assert result.personal_info is source.personal_info
-    assert result.contact_info is source.contact_info
-    assert result.professional_links is source.professional_links
     assert result.education is source.education
     assert result.skills is source.skills
     assert result.technologies is source.technologies
@@ -172,36 +159,82 @@ def test_unmentioned_experiences_and_other_candidate_sections_are_shared() -> No
     assert result.projects is source.projects
 
 
-@pytest.mark.parametrize(
-    "input_proposal",
-    [
-        proposal(ExperienceOptimizationProposal(3, (statement("Invalid."),))),
-        proposal(
-            ExperienceOptimizationProposal(0, (statement("First."),)),
-            ExperienceOptimizationProposal(0, (statement("Second."),)),
-        ),
-    ],
-)
-def test_invalid_or_duplicate_experience_indexes_fail_closed(input_proposal) -> None:
+def test_multiple_experiences_apply_without_reordering_candidate() -> None:
     source = candidate()
+    proposal = CandidateOptimizationProposal(
+        (
+            ExperienceOptimizationProposal(1, (statement("Other optimized", (0,), 1),)),
+            ExperienceOptimizationProposal(0, (statement("A optimized", (0,)),)),
+        )
+    )
+
+    result = apply(source, proposal)
+
+    assert [experience.company for experience in result.experiences] == [
+        "Example Zero",
+        "Example One",
+    ]
+    assert result.experiences[0].activities[0] == Activity("A optimized")
+    assert result.experiences[1].activities == (Activity("Other optimized"),)
+
+
+def test_overlapping_sources_fail_before_candidate_is_built() -> None:
+    source = candidate()
+    proposal = CandidateOptimizationProposal(
+        (
+            ExperienceOptimizationProposal(
+                0, (statement("First", (0,)), statement("Overlap", (0, 1)))
+            ),
+        )
+    )
 
     with pytest.raises(OptimizationProposalGroundingError):
-        apply(source, input_proposal)
+        apply(source, proposal)
 
     assert source == candidate()
 
 
-def test_candidate_and_proposal_are_immutable() -> None:
+@pytest.mark.parametrize(
+    "path",
+    [
+        "experiences[0].role",
+        "experiences[0].company",
+        "experiences[0].achievements[0].description",
+        "experiences[0].start_date",
+        "skills[0].name",
+        "experiences[1].activities[0].description",
+        "experiences[0].activities[99].description",
+    ],
+)
+def test_non_activity_or_invalid_source_path_fails_closed(path: str) -> None:
     source = candidate()
-    input_proposal = proposal(ExperienceOptimizationProposal(0, (statement("Novo texto."),)))
+    proposal = CandidateOptimizationProposal(
+        (
+            ExperienceOptimizationProposal(
+                0,
+                (OptimizedExperienceStatementProposal("Invalid", (path,), (0,)),),
+            ),
+        )
+    )
 
-    result = apply(source, input_proposal)
+    with pytest.raises(OptimizationProposalGroundingError):
+        apply(source, proposal)
+
+
+def test_duplicate_experience_indexes_and_inputs_remain_immutable() -> None:
+    source = candidate()
+    proposal = CandidateOptimizationProposal(
+        (
+            ExperienceOptimizationProposal(0, (statement("First"),)),
+            ExperienceOptimizationProposal(0, (statement("Second", (1,)),)),
+        )
+    )
+
+    with pytest.raises(OptimizationProposalGroundingError):
+        apply(source, proposal)
 
     assert source == candidate()
-    assert input_proposal == proposal(
-        ExperienceOptimizationProposal(0, (statement("Novo texto."),))
-    )
-    assert result.experiences[0].activities != source.experiences[0].activities
+    assert proposal.experiences[0].statements[0].text == "First"
 
 
 def test_applier_contract_has_no_ai_job_or_matching_dependency() -> None:

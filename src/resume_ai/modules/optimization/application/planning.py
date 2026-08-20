@@ -6,7 +6,7 @@ from resume_ai.modules.candidate.domain.entities import Candidate
 from resume_ai.modules.matching.application.provenance import MatchingProvenanceGate
 from resume_ai.modules.matching.domain.entities import MatchingResult, MatchStatus
 
-_EXPERIENCE_PATH = re.compile(r"^experiences\[(\d+)]\.")
+_ACTIVITY_PATH = re.compile(r"^experiences\[(\d+)]\.activities\[(\d+)]\.description$")
 
 
 def _require_index(name: str, value: object) -> None:
@@ -77,7 +77,7 @@ class CandidateOptimizationPlan:
 def _experience_index(paths: tuple[str, ...]) -> int | None:
     indexes = []
     for path in paths:
-        match = _EXPERIENCE_PATH.match(path)
+        match = _ACTIVITY_PATH.fullmatch(path)
         if match is None:
             return None
         indexes.append(int(match.group(1)))

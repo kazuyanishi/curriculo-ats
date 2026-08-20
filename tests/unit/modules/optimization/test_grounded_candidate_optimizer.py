@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import pytest
 
 from resume_ai.modules.candidate.domain.entities import (
+    Achievement,
     Activity,
     Candidate,
     ContactInfo,
@@ -195,6 +196,8 @@ def test_orchestrator_is_fail_closed(failing_stage: str) -> None:
 @dataclass
 class FakeStructuredAIClient:
     calls: list[type]
+    source_path: str = ACTIVITY_PATH
+    optimized_text: str = "Atendimento e acompanhamento de chamados técnicos."
 
     def generate(self, *, system_prompt, user_prompt, response_model):
         self.calls.append(response_model)
@@ -206,8 +209,8 @@ class FakeStructuredAIClient:
                             "experience_index": 0,
                             "statements": [
                                 {
-                                    "text": "Atendimento e acompanhamento de chamados técnicos.",
-                                    "source_paths": [ACTIVITY_PATH],
+                                    "text": self.optimized_text,
+                                    "source_paths": [self.source_path],
                                     "target_match_indexes": [0],
                                 }
                             ],
@@ -274,4 +277,72 @@ def test_no_matches_skips_experience_ai_without_inventing_text() -> None:
     result = real_grounded_optimizer(fake).optimize(source, MatchingResult())
 
     assert result == source
+    assert fake.calls == []
+
+
+def test_unmatched_experience_activities_survive_the_real_grounded_pipeline() -> None:
+    source = Candidate(
+        PersonalInfo("Jane Doe", "Curitiba", "PR", "Brazil"),
+        ContactInfo("jane@example.test", "+55 41 99999-0000"),
+        experiences=(
+            Experience(
+                "Example",
+                "Support Analyst",
+                YearMonth("2020-01"),
+                activities=(
+                    Activity("Atendimento a usuários."),
+                    Activity("Organização de chamados no Jira."),
+                    Activity("Documentação de procedimentos."),
+                ),
+            ),
+        ),
+    )
+    path = "experiences[0].activities[1].description"
+    matching_result = matching(
+        CriterionMatch(
+            criterion(CriterionCategory.EXPERIENCE, "Jira"), MatchStatus.MATCHED, (path,)
+        )
+    )
+    fake = FakeStructuredAIClient(
+        [],
+        source_path=path,
+        optimized_text="Organização e acompanhamento de chamados utilizando Jira.",
+    )
+
+    result = real_grounded_optimizer(fake).optimize(source, matching_result)
+
+    assert tuple(item.description for item in result.experiences[0].activities) == (
+        "Atendimento a usuários.",
+        "Organização e acompanhamento de chamados utilizando Jira.",
+        "Documentação de procedimentos.",
+    )
+
+
+def test_achievement_only_match_stays_standalone_without_experience_ai() -> None:
+    source = Candidate(
+        PersonalInfo("Jane Doe", "Curitiba", "PR", "Brazil"),
+        ContactInfo("jane@example.test", "+55 41 99999-0000"),
+        experiences=(
+            Experience(
+                "Example",
+                "Support Analyst",
+                YearMonth("2020-01"),
+                activities=(Activity("Atendimento a usuários."),),
+                achievements=(Achievement("Redução de tempo de atendimento."),),
+            ),
+        ),
+    )
+    path = "experiences[0].achievements[0].description"
+    fake = FakeStructuredAIClient([])
+
+    result = real_grounded_optimizer(fake).optimize(
+        source,
+        matching(
+            CriterionMatch(
+                criterion(CriterionCategory.OTHER, "Speed"), MatchStatus.MATCHED, (path,)
+            )
+        ),
+    )
+
+    assert result.experiences is source.experiences
     assert fake.calls == []
