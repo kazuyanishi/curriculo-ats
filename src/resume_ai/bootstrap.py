@@ -41,11 +41,20 @@ from resume_ai.modules.matching.domain.services import (
 from resume_ai.modules.matching.infrastructure.semantic_refiner import (
     AISemanticMatchingRefiner,
 )
+from resume_ai.modules.optimization.application.planning import BuildCandidateOptimizationPlan
 from resume_ai.modules.optimization.application.services import (
     AnalyzeCandidateForJob,
+    DeterministicCandidateOptimizationProposalApplier,
+    GroundedCandidateOptimizer,
     OptimizeCandidate,
 )
 from resume_ai.modules.optimization.domain.services import DeterministicCandidateOptimizer
+from resume_ai.modules.optimization.infrastructure.contextual_experience_optimizer import (
+    AIContextualExperienceOptimizer,
+)
+from resume_ai.modules.optimization.infrastructure.semantic_optimization_truth_gate import (
+    AISemanticOptimizationTruthGate,
+)
 
 
 def build_load_candidate(config: AppConfig) -> LoadCandidate:
@@ -108,6 +117,19 @@ def build_optimize_candidate() -> OptimizeCandidate:
     return OptimizeCandidate(DeterministicCandidateOptimizer())
 
 
+def build_grounded_optimize_candidate(config: AIConfig) -> OptimizeCandidate:
+    client = OpenAIStructuredAIClient(config)
+    truth_gate = AISemanticOptimizationTruthGate(client)
+    experience_optimizer = AIContextualExperienceOptimizer(client, truth_gate)
+    grounded_optimizer = GroundedCandidateOptimizer(
+        planner=BuildCandidateOptimizationPlan(MatchingProvenanceGate()),
+        experience_optimizer=experience_optimizer,
+        proposal_applier=DeterministicCandidateOptimizationProposalApplier(),
+        deterministic_optimizer=DeterministicCandidateOptimizer(),
+    )
+    return OptimizeCandidate(grounded_optimizer)
+
+
 def build_analyze_candidate_for_job(config: AIConfig) -> AnalyzeCandidateForJob:
     return AnalyzeCandidateForJob(
         criteria_extractor=build_extract_job_criteria(config),
@@ -116,7 +138,7 @@ def build_analyze_candidate_for_job(config: AIConfig) -> AnalyzeCandidateForJob:
             build_calculate_matching_score(),
         ),
         gap_analyzer=build_analyze_matching_gaps(),
-        optimizer=build_optimize_candidate(),
+        optimizer=build_grounded_optimize_candidate(config),
     )
 
 

@@ -15,6 +15,14 @@ class CandidateExperienceOptimizer(Protocol):
     ) -> CandidateOptimizationProposal: ...
 
 
+class CandidateOptimizer(Protocol):
+    def optimize(
+        self,
+        candidate: Candidate,
+        matching: MatchingResult,
+    ) -> Candidate: ...
+
+
 class CandidateOptimizationTruthGate(Protocol):
     def validate(
         self,

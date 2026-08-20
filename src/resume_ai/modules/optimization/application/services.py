@@ -13,6 +13,12 @@ from resume_ai.modules.matching.domain.entities import (
     MatchingScore,
 )
 from resume_ai.modules.optimization.application.exceptions import OptimizationProposalGroundingError
+from resume_ai.modules.optimization.application.planning import BuildCandidateOptimizationPlan
+from resume_ai.modules.optimization.application.ports import (
+    CandidateExperienceOptimizer,
+    CandidateOptimizationProposalApplier,
+    CandidateOptimizer,
+)
 from resume_ai.modules.optimization.application.proposals import (
     CandidateOptimizationProposal,
     OptimizedExperienceStatementProposal,
@@ -60,8 +66,28 @@ class DeterministicCandidateOptimizationProposalApplier:
         return by_experience_index
 
 
+class GroundedCandidateOptimizer:
+    def __init__(
+        self,
+        planner: BuildCandidateOptimizationPlan,
+        experience_optimizer: CandidateExperienceOptimizer,
+        proposal_applier: CandidateOptimizationProposalApplier,
+        deterministic_optimizer: DeterministicCandidateOptimizer,
+    ) -> None:
+        self._planner = planner
+        self._experience_optimizer = experience_optimizer
+        self._proposal_applier = proposal_applier
+        self._deterministic_optimizer = deterministic_optimizer
+
+    def optimize(self, candidate: Candidate, matching: MatchingResult) -> Candidate:
+        plan = self._planner.execute(candidate, matching)
+        proposal = self._experience_optimizer.optimize(candidate, matching, plan)
+        experience_optimized_candidate = self._proposal_applier.apply(candidate, proposal)
+        return self._deterministic_optimizer.optimize(experience_optimized_candidate, matching)
+
+
 class OptimizeCandidate:
-    def __init__(self, optimizer: DeterministicCandidateOptimizer) -> None:
+    def __init__(self, optimizer: CandidateOptimizer) -> None:
         self._optimizer = optimizer
 
     def execute(self, candidate: Candidate, result: MatchingResult) -> Candidate:

@@ -16,6 +16,7 @@ from resume_ai.modules.matching.domain.entities import (
 from resume_ai.modules.optimization.application.services import (
     AnalyzeCandidateForJob,
     CandidateAnalysisResult,
+    GroundedCandidateOptimizer,
 )
 
 
@@ -130,6 +131,7 @@ def test_pipeline_stops_after_extraction_failure() -> None:
 
 def test_pipeline_stops_after_matching_failure() -> None:
     events: list[str] = []
+
     class FailingMatcher:
         def execute(
             self,
@@ -166,9 +168,7 @@ class FakeOpenAIClient:
         response_model: type[JobCriteriaInput],
     ) -> JobCriteriaInput:
         if response_model.__name__ == "SemanticMatchBatch":
-            return response_model(
-                decisions=({"criterion_index": 0, "status": "not_matched"},)
-            )
+            return response_model(decisions=({"criterion_index": 0, "status": "not_matched"},))
         assert self.response is not None
         return self.response
 
@@ -186,15 +186,15 @@ def test_bootstrap_composes_real_pipeline_with_fake_ai(monkeypatch) -> None:
     )
     monkeypatch.setattr("resume_ai.bootstrap.OpenAIStructuredAIClient", FakeOpenAIClient)
 
-    result = build_analyze_candidate_for_job(AIConfig("key", "model")).execute(
-        _candidate(), JobPosting("Python is required.")
-    )
+    service = build_analyze_candidate_for_job(AIConfig("key", "model"))
+    result = service.execute(_candidate(), JobPosting("Python is required."))
 
     assert result.criteria.criteria[0].value == "Python"
     assert result.matching.total == 1
     assert result.score.score == 0.0
     assert result.gaps.gaps[0].criterion.value == "Python"
     assert result.optimized_candidate is not None
+    assert isinstance(service._optimizer._optimizer, GroundedCandidateOptimizer)
 
 
 def test_bootstrap_truth_gate_blocks_hallucinated_evidence(monkeypatch) -> None:
