@@ -56,6 +56,23 @@ class FakeHybridOpenAIClient(FakeOpenAIClient):
                     }
                 ]
             )
+        if response_model.__name__ == "CandidateOptimizationAIResponse":
+            return response_model(
+                experiences=(
+                    {
+                        "experience_index": 0,
+                        "statements": (
+                            {
+                                "text": "Configuração de redes e servidores.",
+                                "source_paths": ("experiences[0].activities[0].description",),
+                                "target_match_indexes": (0,),
+                            },
+                        ),
+                    },
+                )
+            )
+        if response_model.__name__ == "OptimizationStatementTruthDecision":
+            return response_model(fully_supported=True)
         return SemanticMatchBatch(
             decisions=(
                 {

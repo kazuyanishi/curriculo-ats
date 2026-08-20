@@ -1,0 +1,277 @@
+from dataclasses import dataclass
+
+import pytest
+
+from resume_ai.modules.candidate.domain.entities import (
+    Activity,
+    Candidate,
+    ContactInfo,
+    Experience,
+    PersonalInfo,
+    Skill,
+)
+from resume_ai.modules.candidate.domain.value_objects import YearMonth
+from resume_ai.modules.jobs.domain.entities import CriterionCategory, JobCriterion
+from resume_ai.modules.matching.application.provenance import MatchingProvenanceGate
+from resume_ai.modules.matching.domain.entities import CriterionMatch, MatchingResult, MatchStatus
+from resume_ai.modules.optimization.application.planning import (
+    BuildCandidateOptimizationPlan,
+    CandidateOptimizationPlan,
+)
+from resume_ai.modules.optimization.application.proposals import (
+    CandidateOptimizationProposal,
+)
+from resume_ai.modules.optimization.application.services import (
+    DeterministicCandidateOptimizationProposalApplier,
+    GroundedCandidateOptimizer,
+)
+from resume_ai.modules.optimization.domain.services import DeterministicCandidateOptimizer
+from resume_ai.modules.optimization.infrastructure.contextual_experience_optimizer import (
+    AIContextualExperienceOptimizer,
+)
+from resume_ai.modules.optimization.infrastructure.contextual_experience_schemas import (
+    CandidateOptimizationAIResponse,
+)
+from resume_ai.modules.optimization.infrastructure.optimization_truth_gate_schemas import (
+    OptimizationStatementTruthDecision,
+)
+from resume_ai.modules.optimization.infrastructure.semantic_optimization_truth_gate import (
+    AISemanticOptimizationTruthGate,
+)
+
+ACTIVITY_PATH = "experiences[0].activities[0].description"
+SKILL_PATH = "skills[1].name"
+
+
+def candidate() -> Candidate:
+    return Candidate(
+        PersonalInfo("Jane Doe", "Curitiba", "PR", "Brazil"),
+        ContactInfo("jane@example.test", "+55 41 99999-0000"),
+        experiences=(
+            Experience(
+                "Example",
+                "Support Analyst",
+                YearMonth("2020-01"),
+                activities=(Activity("Atendimento e acompanhamento de chamados."),),
+            ),
+        ),
+        skills=(Skill("Python"), Skill("Communication")),
+    )
+
+
+def matching(*matches: CriterionMatch) -> MatchingResult:
+    return MatchingResult(matches)
+
+
+def criterion(category: CriterionCategory, value: str) -> JobCriterion:
+    return JobCriterion(category, value, f"{value} is required.")
+
+
+class RecordingPlanner:
+    def __init__(self, plan: CandidateOptimizationPlan, events: list[str]) -> None:
+        self.plan = plan
+        self.events = events
+        self.received = None
+
+    def execute(self, candidate: Candidate, matching: MatchingResult) -> CandidateOptimizationPlan:
+        self.events.append("planner")
+        self.received = (candidate, matching)
+        return self.plan
+
+
+class RecordingExperienceOptimizer:
+    def __init__(self, proposal: CandidateOptimizationProposal, events: list[str]) -> None:
+        self.proposal = proposal
+        self.events = events
+        self.received = None
+
+    def optimize(self, candidate, matching, plan) -> CandidateOptimizationProposal:
+        self.events.append("experience_optimizer")
+        self.received = (candidate, matching, plan)
+        return self.proposal
+
+
+class RecordingApplier:
+    def __init__(self, output: Candidate, events: list[str]) -> None:
+        self.output = output
+        self.events = events
+        self.received = None
+
+    def apply(self, candidate, proposal) -> Candidate:
+        self.events.append("applier")
+        self.received = (candidate, proposal)
+        return self.output
+
+
+class RecordingDeterministicOptimizer:
+    def __init__(self, output: Candidate, events: list[str]) -> None:
+        self.output = output
+        self.events = events
+        self.received = None
+
+    def optimize(self, candidate, matching) -> Candidate:
+        self.events.append("deterministic")
+        self.received = (candidate, matching)
+        return self.output
+
+
+def test_orchestrator_runs_in_order_with_original_inputs() -> None:
+    events: list[str] = []
+    source = candidate()
+    result = candidate()
+    applied = candidate()
+    matching_result = MatchingResult()
+    plan = CandidateOptimizationPlan()
+    proposal = CandidateOptimizationProposal()
+    planner = RecordingPlanner(plan, events)
+    experience_optimizer = RecordingExperienceOptimizer(proposal, events)
+    applier = RecordingApplier(applied, events)
+    deterministic = RecordingDeterministicOptimizer(result, events)
+
+    output = GroundedCandidateOptimizer(
+        planner,  # type: ignore[arg-type]
+        experience_optimizer,  # type: ignore[arg-type]
+        applier,  # type: ignore[arg-type]
+        deterministic,  # type: ignore[arg-type]
+    ).optimize(source, matching_result)
+
+    assert events == ["planner", "experience_optimizer", "applier", "deterministic"]
+    assert planner.received == (source, matching_result)
+    assert experience_optimizer.received == (source, matching_result, plan)
+    assert applier.received == (source, proposal)
+    assert deterministic.received == (applied, matching_result)
+    assert output is result
+
+
+@pytest.mark.parametrize("failing_stage", ["planner", "experience_optimizer", "applier"])
+def test_orchestrator_is_fail_closed(failing_stage: str) -> None:
+    events: list[str] = []
+    source = candidate()
+
+    class FailingPlanner:
+        def execute(self, candidate, matching):
+            events.append("planner")
+            if failing_stage == "planner":
+                raise RuntimeError("planner failure")
+            return CandidateOptimizationPlan()
+
+    class FailingExperienceOptimizer:
+        def optimize(self, candidate, matching, plan):
+            events.append("experience_optimizer")
+            if failing_stage == "experience_optimizer":
+                raise RuntimeError("experience optimizer failure")
+            return CandidateOptimizationProposal()
+
+    class FailingApplier:
+        def apply(self, candidate, proposal):
+            events.append("applier")
+            if failing_stage == "applier":
+                raise RuntimeError("applier failure")
+            return candidate
+
+    class MustNotRun:
+        def optimize(self, candidate, matching):
+            raise AssertionError("deterministic optimizer should not execute")
+
+    with pytest.raises(RuntimeError):
+        GroundedCandidateOptimizer(
+            FailingPlanner(),  # type: ignore[arg-type]
+            FailingExperienceOptimizer(),  # type: ignore[arg-type]
+            FailingApplier(),  # type: ignore[arg-type]
+            MustNotRun(),  # type: ignore[arg-type]
+        ).optimize(source, MatchingResult())
+
+    assert (
+        events
+        == {
+            "planner": ["planner"],
+            "experience_optimizer": ["planner", "experience_optimizer"],
+            "applier": ["planner", "experience_optimizer", "applier"],
+        }[failing_stage]
+    )
+    assert source == candidate()
+
+
+@dataclass
+class FakeStructuredAIClient:
+    calls: list[type]
+
+    def generate(self, *, system_prompt, user_prompt, response_model):
+        self.calls.append(response_model)
+        if response_model is CandidateOptimizationAIResponse:
+            return CandidateOptimizationAIResponse.model_validate(
+                {
+                    "experiences": [
+                        {
+                            "experience_index": 0,
+                            "statements": [
+                                {
+                                    "text": "Atendimento e acompanhamento de chamados técnicos.",
+                                    "source_paths": [ACTIVITY_PATH],
+                                    "target_match_indexes": [0],
+                                }
+                            ],
+                        }
+                    ]
+                }
+            )
+        assert response_model is OptimizationStatementTruthDecision
+        return OptimizationStatementTruthDecision(fully_supported=True)
+
+
+def real_grounded_optimizer(client: FakeStructuredAIClient) -> GroundedCandidateOptimizer:
+    return GroundedCandidateOptimizer(
+        BuildCandidateOptimizationPlan(MatchingProvenanceGate()),
+        AIContextualExperienceOptimizer(client, AISemanticOptimizationTruthGate(client)),
+        DeterministicCandidateOptimizationProposalApplier(),
+        DeterministicCandidateOptimizer(),
+    )
+
+
+def test_real_components_apply_grounded_experience_and_preserve_standalone_behavior() -> None:
+    source = candidate()
+    matching_result = matching(
+        CriterionMatch(
+            criterion(CriterionCategory.EXPERIENCE, "Support"),
+            MatchStatus.MATCHED,
+            (ACTIVITY_PATH,),
+        ),
+        CriterionMatch(
+            criterion(CriterionCategory.SKILL, "Communication"), MatchStatus.MATCHED, (SKILL_PATH,)
+        ),
+    )
+    fake = FakeStructuredAIClient([])
+
+    result = real_grounded_optimizer(fake).optimize(source, matching_result)
+
+    assert result.experiences[0].activities == (
+        Activity("Atendimento e acompanhamento de chamados técnicos."),
+    )
+    assert tuple(item.name for item in result.skills) == ("Communication", "Python")
+    assert fake.calls == [CandidateOptimizationAIResponse, OptimizationStatementTruthDecision]
+
+
+def test_standalone_only_matching_skips_experience_ai_and_keeps_legacy_prioritization() -> None:
+    source = candidate()
+    matching_result = matching(
+        CriterionMatch(
+            criterion(CriterionCategory.SKILL, "Communication"), MatchStatus.MATCHED, (SKILL_PATH,)
+        ),
+    )
+    fake = FakeStructuredAIClient([])
+
+    result = real_grounded_optimizer(fake).optimize(source, matching_result)
+
+    assert result.experiences is source.experiences
+    assert tuple(item.name for item in result.skills) == ("Communication", "Python")
+    assert fake.calls == []
+
+
+def test_no_matches_skips_experience_ai_without_inventing_text() -> None:
+    source = candidate()
+    fake = FakeStructuredAIClient([])
+
+    result = real_grounded_optimizer(fake).optimize(source, MatchingResult())
+
+    assert result == source
+    assert fake.calls == []
