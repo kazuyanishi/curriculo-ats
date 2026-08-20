@@ -228,6 +228,7 @@ def test_payload_contains_only_context_evidence_and_context_criteria() -> None:
             "value": "criterion-1",
             "evidence": "evidence-1",
             "importance": "unspecified",
+            "candidate_evidence_paths": [B],
         }
     ]
     assert payload["experience_contexts"][0]["candidate_evidence"] == [
@@ -311,6 +312,88 @@ def test_empty_and_partial_statements_are_allowed() -> None:
     assert proposal.experiences[0].statements[0].target_match_indexes == (0, 1)
 
 
+@pytest.mark.parametrize(
+    ("source_paths", "target_match_indexes"),
+    [
+        ((A,), (1,)),
+        ((A, B), (0,)),
+    ],
+)
+def test_invalid_source_target_binding_fails_before_truth_gate(
+    source_paths: tuple[str, ...],
+    target_match_indexes: tuple[int, ...],
+) -> None:
+    matching_result = matching(((MatchStatus.MATCHED, (A,)), (MatchStatus.MATCHED, (B,))))
+    plan = CandidateOptimizationPlan((ExperienceOptimizationContext(0, (0, 1), (A, B)),))
+    truth_gate = NoopTruthGate()
+    fake = FakeStructuredAIClient(
+        response(
+            [
+                {
+                    "experience_index": 0,
+                    "statements": [
+                        {
+                            "text": "Proposta inválida.",
+                            "source_paths": source_paths,
+                            "target_match_indexes": target_match_indexes,
+                        }
+                    ],
+                }
+            ]
+        )
+    )
+
+    with pytest.raises(OptimizationProposalGroundingError):
+        AIContextualExperienceOptimizer(fake, truth_gate).optimize(
+            candidate(), matching_result, plan
+        )
+
+    assert truth_gate.calls == []
+
+
+@pytest.mark.parametrize(
+    ("match_paths", "source_paths", "target_match_indexes"),
+    [
+        (((A,), (B,)), (A, B), (0, 1)),
+        (((A,), (A,)), (A,), (0, 1)),
+        (((A, B),), (A,), (0,)),
+    ],
+)
+def test_valid_source_target_binding_reaches_truth_gate(
+    match_paths: tuple[tuple[str, ...], ...],
+    source_paths: tuple[str, ...],
+    target_match_indexes: tuple[int, ...],
+) -> None:
+    matching_result = matching(tuple((MatchStatus.MATCHED, paths) for paths in match_paths))
+    context_paths = tuple(dict.fromkeys(path for paths in match_paths for path in paths))
+    plan = CandidateOptimizationPlan(
+        (ExperienceOptimizationContext(0, tuple(range(len(match_paths))), context_paths),)
+    )
+    truth_gate = NoopTruthGate()
+    fake = FakeStructuredAIClient(
+        response(
+            [
+                {
+                    "experience_index": 0,
+                    "statements": [
+                        {
+                            "text": "Proposta válida.",
+                            "source_paths": source_paths,
+                            "target_match_indexes": target_match_indexes,
+                        }
+                    ],
+                }
+            ]
+        )
+    )
+
+    proposal = AIContextualExperienceOptimizer(fake, truth_gate).optimize(
+        candidate(), matching_result, plan
+    )
+
+    assert truth_gate.calls == [(candidate(), proposal)]
+
+
 def test_invalid_plan_indexes_or_non_matches_fail_before_ai_call() -> None:
     fake = FakeStructuredAIClient(response([]))
     valid_matching = matching(((MatchStatus.MATCHED, (A,)),))
@@ -371,6 +454,8 @@ def test_inputs_are_immutable_and_prompt_declares_safety_contract() -> None:
         "keyword stuffing",
         "source_paths",
         "target_match_indexes",
+        "candidate_evidence_paths",
+        "different criterion",
     ):
         assert concept in prompt
 
