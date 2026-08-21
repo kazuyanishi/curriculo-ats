@@ -4,6 +4,7 @@ from dataclasses import dataclass, replace
 from resume_ai.modules.candidate.domain.entities import Activity, Candidate
 from resume_ai.modules.jobs.application.services import ExtractJobCriteria
 from resume_ai.modules.jobs.domain.entities import JobCriteria, JobPosting
+from resume_ai.modules.matching.application.catalog import build_candidate_evidence_catalog
 from resume_ai.modules.matching.application.services import (
     AnalyzeMatchingGaps,
     MatchAndScoreCandidateToJob,
@@ -14,19 +15,25 @@ from resume_ai.modules.matching.domain.entities import (
     MatchingScore,
 )
 from resume_ai.modules.optimization.application.exceptions import OptimizationProposalGroundingError
-from resume_ai.modules.optimization.application.planning import BuildCandidateOptimizationPlan
+from resume_ai.modules.optimization.application.planning import (
+    BuildCandidateOptimizationPlan,
+    CandidateOptimizationPlan,
+)
 from resume_ai.modules.optimization.application.ports import (
     CandidateExperienceOptimizer,
     CandidateOptimizationProposalApplier,
     CandidateOptimizer,
+    CandidateStandaloneOptimizer,
 )
 from resume_ai.modules.optimization.application.proposals import (
     CandidateOptimizationProposal,
     OptimizedExperienceStatementProposal,
 )
-from resume_ai.modules.optimization.domain.services import DeterministicCandidateOptimizer
 
 _ACTIVITY_PATH = re.compile(r"^experiences\[(\d+)]\.activities\[(\d+)]\.description$")
+_STANDALONE_PATH = re.compile(
+    r"^(skills|technologies|tools|languages|certifications)\[(\d+)]\.[^.]+$"
+)
 
 
 class DeterministicCandidateOptimizationProposalApplier:
@@ -119,24 +126,58 @@ class DeterministicCandidateOptimizationProposalApplier:
         )
 
 
+class GroundedStandaloneCandidateOptimizer:
+    def optimize(self, candidate: Candidate, plan: CandidateOptimizationPlan) -> Candidate:
+        catalog_paths = {item.path for item in build_candidate_evidence_catalog(candidate)}
+        indexes_by_collection = {
+            collection: set()
+            for collection in ("skills", "technologies", "tools", "languages", "certifications")
+        }
+        for context in plan.standalone_contexts:
+            for path in context.evidence_paths:
+                if path not in catalog_paths:
+                    raise OptimizationProposalGroundingError()
+                match = _STANDALONE_PATH.fullmatch(path)
+                if match is not None:
+                    indexes_by_collection[match.group(1)].add(int(match.group(2)))
+
+        reordered = {}
+        for collection, indexes in indexes_by_collection.items():
+            items = getattr(candidate, collection)
+            prioritized = self._prioritize(items, indexes)
+            if prioritized is not items:
+                reordered[collection] = prioritized
+        return replace(candidate, **reordered) if reordered else candidate
+
+    @staticmethod
+    def _prioritize(items: tuple[object, ...], indexes: set[int]) -> tuple[object, ...]:
+        ordered_indexes = [
+            *[index for index in range(len(items)) if index in indexes],
+            *[index for index in range(len(items)) if index not in indexes],
+        ]
+        if ordered_indexes == list(range(len(items))):
+            return items
+        return tuple(items[index] for index in ordered_indexes)
+
+
 class GroundedCandidateOptimizer:
     def __init__(
         self,
         planner: BuildCandidateOptimizationPlan,
         experience_optimizer: CandidateExperienceOptimizer,
         proposal_applier: CandidateOptimizationProposalApplier,
-        deterministic_optimizer: DeterministicCandidateOptimizer,
+        standalone_optimizer: CandidateStandaloneOptimizer,
     ) -> None:
         self._planner = planner
         self._experience_optimizer = experience_optimizer
         self._proposal_applier = proposal_applier
-        self._deterministic_optimizer = deterministic_optimizer
+        self._standalone_optimizer = standalone_optimizer
 
     def optimize(self, candidate: Candidate, matching: MatchingResult) -> Candidate:
         plan = self._planner.execute(candidate, matching)
         proposal = self._experience_optimizer.optimize(candidate, matching, plan)
         experience_optimized_candidate = self._proposal_applier.apply(candidate, proposal)
-        return self._deterministic_optimizer.optimize(experience_optimized_candidate, matching)
+        return self._standalone_optimizer.optimize(experience_optimized_candidate, plan)
 
 
 class OptimizeCandidate:

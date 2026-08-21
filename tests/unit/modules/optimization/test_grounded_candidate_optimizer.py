@@ -10,6 +10,7 @@ from resume_ai.modules.candidate.domain.entities import (
     Experience,
     PersonalInfo,
     Skill,
+    Technology,
 )
 from resume_ai.modules.candidate.domain.value_objects import YearMonth
 from resume_ai.modules.jobs.domain.entities import CriterionCategory, JobCriterion
@@ -25,8 +26,8 @@ from resume_ai.modules.optimization.application.proposals import (
 from resume_ai.modules.optimization.application.services import (
     DeterministicCandidateOptimizationProposalApplier,
     GroundedCandidateOptimizer,
+    GroundedStandaloneCandidateOptimizer,
 )
-from resume_ai.modules.optimization.domain.services import DeterministicCandidateOptimizer
 from resume_ai.modules.optimization.infrastructure.contextual_experience_optimizer import (
     AIContextualExperienceOptimizer,
 )
@@ -57,6 +58,7 @@ def candidate() -> Candidate:
             ),
         ),
         skills=(Skill("Python"), Skill("Communication")),
+        technologies=(Technology("Docker"), Technology("PostgreSQL")),
     )
 
 
@@ -104,15 +106,15 @@ class RecordingApplier:
         return self.output
 
 
-class RecordingDeterministicOptimizer:
+class RecordingStandaloneOptimizer:
     def __init__(self, output: Candidate, events: list[str]) -> None:
         self.output = output
         self.events = events
         self.received = None
 
-    def optimize(self, candidate, matching) -> Candidate:
-        self.events.append("deterministic")
-        self.received = (candidate, matching)
+    def optimize(self, candidate, plan) -> Candidate:
+        self.events.append("standalone")
+        self.received = (candidate, plan)
         return self.output
 
 
@@ -127,24 +129,26 @@ def test_orchestrator_runs_in_order_with_original_inputs() -> None:
     planner = RecordingPlanner(plan, events)
     experience_optimizer = RecordingExperienceOptimizer(proposal, events)
     applier = RecordingApplier(applied, events)
-    deterministic = RecordingDeterministicOptimizer(result, events)
+    standalone = RecordingStandaloneOptimizer(result, events)
 
     output = GroundedCandidateOptimizer(
         planner,  # type: ignore[arg-type]
         experience_optimizer,  # type: ignore[arg-type]
         applier,  # type: ignore[arg-type]
-        deterministic,  # type: ignore[arg-type]
+        standalone,  # type: ignore[arg-type]
     ).optimize(source, matching_result)
 
-    assert events == ["planner", "experience_optimizer", "applier", "deterministic"]
+    assert events == ["planner", "experience_optimizer", "applier", "standalone"]
     assert planner.received == (source, matching_result)
     assert experience_optimizer.received == (source, matching_result, plan)
     assert applier.received == (source, proposal)
-    assert deterministic.received == (applied, matching_result)
+    assert standalone.received == (applied, plan)
     assert output is result
 
 
-@pytest.mark.parametrize("failing_stage", ["planner", "experience_optimizer", "applier"])
+@pytest.mark.parametrize(
+    "failing_stage", ["planner", "experience_optimizer", "applier", "standalone"]
+)
 def test_orchestrator_is_fail_closed(failing_stage: str) -> None:
     events: list[str] = []
     source = candidate()
@@ -170,16 +174,19 @@ def test_orchestrator_is_fail_closed(failing_stage: str) -> None:
                 raise RuntimeError("applier failure")
             return candidate
 
-    class MustNotRun:
-        def optimize(self, candidate, matching):
-            raise AssertionError("deterministic optimizer should not execute")
+    class FailingStandaloneOptimizer:
+        def optimize(self, candidate, plan):
+            events.append("standalone")
+            if failing_stage == "standalone":
+                raise RuntimeError("standalone optimizer failure")
+            raise AssertionError("standalone optimizer should not execute")
 
     with pytest.raises(RuntimeError):
         GroundedCandidateOptimizer(
             FailingPlanner(),  # type: ignore[arg-type]
             FailingExperienceOptimizer(),  # type: ignore[arg-type]
             FailingApplier(),  # type: ignore[arg-type]
-            MustNotRun(),  # type: ignore[arg-type]
+            FailingStandaloneOptimizer(),  # type: ignore[arg-type]
         ).optimize(source, MatchingResult())
 
     assert (
@@ -188,6 +195,7 @@ def test_orchestrator_is_fail_closed(failing_stage: str) -> None:
             "planner": ["planner"],
             "experience_optimizer": ["planner", "experience_optimizer"],
             "applier": ["planner", "experience_optimizer", "applier"],
+            "standalone": ["planner", "experience_optimizer", "applier", "standalone"],
         }[failing_stage]
     )
     assert source == candidate()
@@ -227,7 +235,7 @@ def real_grounded_optimizer(client: FakeStructuredAIClient) -> GroundedCandidate
         BuildCandidateOptimizationPlan(MatchingProvenanceGate()),
         AIContextualExperienceOptimizer(client, AISemanticOptimizationTruthGate(client)),
         DeterministicCandidateOptimizationProposalApplier(),
-        DeterministicCandidateOptimizer(),
+        GroundedStandaloneCandidateOptimizer(),
     )
 
 
@@ -268,6 +276,50 @@ def test_standalone_only_matching_skips_experience_ai_and_keeps_legacy_prioritiz
     assert result.experiences is source.experiences
     assert tuple(item.name for item in result.skills) == ("Communication", "Python")
     assert fake.calls == []
+
+
+def test_real_pipeline_prioritizes_semantic_technology_match_by_provenance() -> None:
+    source = candidate()
+    fake = FakeStructuredAIClient([])
+
+    result = real_grounded_optimizer(fake).optimize(
+        source,
+        matching(
+            CriterionMatch(
+                criterion(CriterionCategory.EXPERIENCE, "Support"),
+                MatchStatus.MATCHED,
+                (ACTIVITY_PATH,),
+            ),
+            CriterionMatch(
+                criterion(CriterionCategory.OTHER, "Postgres"),
+                MatchStatus.MATCHED,
+                ("technologies[1].name",),
+            ),
+        ),
+    )
+
+    assert tuple(item.name for item in result.technologies) == ("PostgreSQL", "Docker")
+    assert result.technologies[0] is source.technologies[1]
+    assert fake.calls == [CandidateOptimizationAIResponse, OptimizationStatementTruthDecision]
+
+
+def test_real_pipeline_does_not_prioritize_skill_from_criterion_text_alone() -> None:
+    source = candidate()
+    fake = FakeStructuredAIClient([])
+
+    result = real_grounded_optimizer(fake).optimize(
+        source,
+        matching(
+            CriterionMatch(
+                criterion(CriterionCategory.SKILL, "Python"),
+                MatchStatus.MATCHED,
+                (ACTIVITY_PATH,),
+            ),
+        ),
+    )
+
+    assert result.skills is source.skills
+    assert fake.calls == [CandidateOptimizationAIResponse, OptimizationStatementTruthDecision]
 
 
 def test_no_matches_skips_experience_ai_without_inventing_text() -> None:

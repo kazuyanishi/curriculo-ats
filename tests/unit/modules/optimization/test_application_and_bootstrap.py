@@ -5,6 +5,7 @@ from resume_ai.modules.matching.domain.entities import MatchingResult
 from resume_ai.modules.optimization.application.services import (
     DeterministicCandidateOptimizationProposalApplier,
     GroundedCandidateOptimizer,
+    GroundedStandaloneCandidateOptimizer,
     OptimizeCandidate,
 )
 from resume_ai.modules.optimization.domain.services import DeterministicCandidateOptimizer
@@ -47,7 +48,9 @@ def test_bootstrap_builds_grounded_optimizer_without_calling_ai() -> None:
 
     assert isinstance(service, OptimizeCandidate)
     assert isinstance(service._optimizer, GroundedCandidateOptimizer)
-    assert isinstance(service._optimizer._deterministic_optimizer, DeterministicCandidateOptimizer)
+    assert isinstance(
+        service._optimizer._standalone_optimizer, GroundedStandaloneCandidateOptimizer
+    )
     assert isinstance(service._optimizer._experience_optimizer, AIContextualExperienceOptimizer)
     assert isinstance(
         service._optimizer._experience_optimizer._truth_gate, AISemanticOptimizationTruthGate

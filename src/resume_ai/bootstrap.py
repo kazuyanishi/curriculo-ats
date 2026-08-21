@@ -46,6 +46,7 @@ from resume_ai.modules.optimization.application.services import (
     AnalyzeCandidateForJob,
     DeterministicCandidateOptimizationProposalApplier,
     GroundedCandidateOptimizer,
+    GroundedStandaloneCandidateOptimizer,
     OptimizeCandidate,
 )
 from resume_ai.modules.optimization.domain.services import DeterministicCandidateOptimizer
@@ -125,7 +126,7 @@ def build_grounded_optimize_candidate(config: AIConfig) -> OptimizeCandidate:
         planner=BuildCandidateOptimizationPlan(MatchingProvenanceGate()),
         experience_optimizer=experience_optimizer,
         proposal_applier=DeterministicCandidateOptimizationProposalApplier(),
-        deterministic_optimizer=DeterministicCandidateOptimizer(),
+        standalone_optimizer=GroundedStandaloneCandidateOptimizer(),
     )
     return OptimizeCandidate(grounded_optimizer)
 
