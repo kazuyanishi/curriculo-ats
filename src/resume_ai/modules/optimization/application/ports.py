@@ -23,6 +23,14 @@ class CandidateOptimizer(Protocol):
     ) -> Candidate: ...
 
 
+class CandidateStandaloneOptimizer(Protocol):
+    def optimize(
+        self,
+        candidate: Candidate,
+        plan: CandidateOptimizationPlan,
+    ) -> Candidate: ...
+
+
 class CandidateOptimizationTruthGate(Protocol):
     def validate(
         self,
