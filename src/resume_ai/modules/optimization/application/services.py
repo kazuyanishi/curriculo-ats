@@ -25,17 +25,21 @@ from resume_ai.modules.optimization.application.ports import (
     CandidateExperienceOptimizer,
     CandidateOptimizationProposalApplier,
     CandidateOptimizer,
+    CandidateProjectOptimizationProposalApplier,
+    CandidateProjectOptimizer,
     CandidateStandaloneOptimizer,
 )
 from resume_ai.modules.optimization.application.proposals import (
     CandidateAchievementOptimizationProposal,
     CandidateOptimizationProposal,
+    CandidateProjectOptimizationProposal,
     OptimizedAchievementStatementProposal,
     OptimizedExperienceStatementProposal,
 )
 
 _ACTIVITY_PATH = re.compile(r"^experiences\[(\d+)]\.activities\[(\d+)]\.description$")
 _ACHIEVEMENT_PATH = re.compile(r"^experiences\[(\d+)]\.achievements\[(\d+)]\.description$")
+_PROJECT_PATH = re.compile(r"^projects\[(\d+)]\.description$")
 _STANDALONE_PATH = re.compile(
     r"^(skills|technologies|tools|languages|certifications)\[(\d+)]\.[^.]+$"
 )
@@ -222,6 +226,31 @@ class DeterministicCandidateAchievementOptimizationProposalApplier:
         )
 
 
+class DeterministicCandidateProjectOptimizationProposalApplier:
+    def apply(
+        self, candidate: Candidate, proposal: CandidateProjectOptimizationProposal
+    ) -> Candidate:
+        replacements: dict[int, str] = {}
+        for project_proposal in proposal.projects:
+            index = project_proposal.project_index
+            if not 0 <= index < len(candidate.projects) or index in replacements:
+                raise OptimizationProposalGroundingError()
+            if project_proposal.description is None:
+                continue
+            for path in project_proposal.description.source_paths:
+                match = _PROJECT_PATH.fullmatch(path)
+                if match is None or int(match.group(1)) != index:
+                    raise OptimizationProposalGroundingError()
+            replacements[index] = project_proposal.description.text
+        if not replacements:
+            return candidate
+        projects = tuple(
+            replace(project, description=replacements[index]) if index in replacements else project
+            for index, project in enumerate(candidate.projects)
+        )
+        return replace(candidate, projects=projects)
+
+
 class GroundedStandaloneCandidateOptimizer:
     def optimize(self, candidate: Candidate, plan: CandidateOptimizationPlan) -> Candidate:
         catalog_paths = {item.path for item in build_candidate_evidence_catalog(candidate)}
@@ -265,23 +294,37 @@ class GroundedCandidateOptimizer:
         proposal_applier: CandidateOptimizationProposalApplier,
         achievement_proposal_applier: CandidateAchievementOptimizationProposalApplier,
         standalone_optimizer: CandidateStandaloneOptimizer,
+        project_optimizer: CandidateProjectOptimizer | None = None,
+        project_proposal_applier: CandidateProjectOptimizationProposalApplier | None = None,
     ) -> None:
         self._planner = planner
         self._experience_optimizer = experience_optimizer
         self._achievement_optimizer = achievement_optimizer
+        self._project_optimizer = project_optimizer
         self._proposal_applier = proposal_applier
         self._achievement_proposal_applier = achievement_proposal_applier
+        self._project_proposal_applier = project_proposal_applier
         self._standalone_optimizer = standalone_optimizer
 
     def optimize(self, candidate: Candidate, matching: MatchingResult) -> Candidate:
         plan = self._planner.execute(candidate, matching)
         activity_proposal = self._experience_optimizer.optimize(candidate, matching, plan)
         achievement_proposal = self._achievement_optimizer.optimize(candidate, matching, plan)
+        project_proposal = (
+            self._project_optimizer.optimize(candidate, matching, plan)
+            if self._project_optimizer is not None
+            else CandidateProjectOptimizationProposal()
+        )
         after_activities = self._proposal_applier.apply(candidate, activity_proposal)
         after_achievements = self._achievement_proposal_applier.apply(
             after_activities, achievement_proposal
         )
-        return self._standalone_optimizer.optimize(after_achievements, plan)
+        after_projects = (
+            self._project_proposal_applier.apply(after_achievements, project_proposal)
+            if self._project_proposal_applier is not None
+            else after_achievements
+        )
+        return self._standalone_optimizer.optimize(after_projects, plan)
 
 
 class OptimizeCandidate:
