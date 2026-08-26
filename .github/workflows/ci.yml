@@ -54,8 +54,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
-      NODE_VERSION: 24.19.0
-      NODE_DIST: node-v24.19.0-linux-x64
       NODE_SHA256: 14b342e71204f811bde6153be8e04b62aef63c236fef92b55f9c83154b409647
     defaults:
       run:
@@ -69,21 +67,31 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          node_version="$(tr -d '[:space:]' < .nvmrc)"
+          test -n "$node_version"
+          test "$node_version" = "24.19.0"
+          node_dist="node-v${node_version}-linux-x64"
           archive="$RUNNER_TEMP/node.tar.xz"
           curl --fail --location --proto '=https' --tlsv1.2 --output "$archive" \
-            "https://nodejs.org/dist/v${NODE_VERSION}/${NODE_DIST}.tar.xz"
+            "https://nodejs.org/dist/v${node_version}/${node_dist}.tar.xz"
           echo "${NODE_SHA256}  ${archive}" | sha256sum --check --strict
           mkdir -p "$RUNNER_TEMP/node"
           tar -xJf "$archive" -C "$RUNNER_TEMP/node" --strip-components=1
           echo "$RUNNER_TEMP/node/bin" >> "$GITHUB_PATH"
-      - name: Install frontend dependencies
-        run: npm ci
-      - name: Show frontend versions
+      - name: Verify frontend toolchain
+        shell: bash
         run: |
+          set -euo pipefail
+          expected_node="$(tr -d '[:space:]' < .nvmrc)"
           node --version
           npm --version
           test "$(node --version)" = "v24.19.0"
           test "$(npm --version)" = "11.17.0"
+          test "$(node --version)" = "v${expected_node}"
+          engine_node="$(node -p "require('./package.json').engines.node")"
+          test "$engine_node" = "$expected_node"
+      - name: Install frontend dependencies
+        run: npm ci
       - name: TypeScript
         run: npx tsc --noEmit
       - name: Lint
