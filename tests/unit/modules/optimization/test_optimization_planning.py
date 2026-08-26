@@ -22,6 +22,7 @@ from resume_ai.modules.matching.application.provenance import (
 )
 from resume_ai.modules.matching.domain.entities import CriterionMatch, MatchingResult, MatchStatus
 from resume_ai.modules.optimization.application.planning import (
+    AchievementOptimizationContext,
     BuildCandidateOptimizationPlan,
     CandidateOptimizationPlan,
     ExperienceOptimizationContext,
@@ -135,7 +136,6 @@ def test_multi_experience_and_experience_technology_matches_stay_standalone() ->
             True,
         ),
         (("experiences[0].role",), False),
-        (("experiences[0].achievements[0].description",), False),
         (("experiences[0].activities[0].description", "experiences[0].role"), False),
         (
             (
@@ -170,11 +170,53 @@ def test_technology_and_education_matches_stay_standalone() -> None:
             )
         ),
     )
-
     assert plan.standalone_contexts == (
         StandaloneOptimizationContext(0, ("technologies[2].name",)),
         StandaloneOptimizationContext(1, ("education[0].course", "education[0].status")),
     )
+
+
+def test_achievement_matches_are_grouped_by_experience_in_stable_order() -> None:
+    first = "experiences[0].achievements[0].description"
+    second = "experiences[1].achievements[0].description"
+    plan = planner().execute(
+        candidate(),
+        MatchingResult(
+            (
+                match(MatchStatus.MATCHED, first),
+                match(MatchStatus.MATCHED, first),
+                match(MatchStatus.MATCHED, second),
+            )
+        ),
+    )
+
+    assert plan.achievement_contexts == (
+        AchievementOptimizationContext(0, (0, 1), (first,)),
+        AchievementOptimizationContext(1, (2,), (second,)),
+    )
+
+
+@pytest.mark.parametrize(
+    "paths",
+    [
+        (
+            "experiences[0].activities[0].description",
+            "experiences[0].achievements[0].description",
+        ),
+        (
+            "experiences[0].achievements[0].description",
+            "experiences[1].achievements[0].description",
+        ),
+        ("experiences[0].achievements[0].description", "technologies[0].name"),
+        ("experiences[0].achievements[0].description", "experiences[0].role"),
+    ],
+)
+def test_mixed_achievement_provenance_stays_standalone(paths: tuple[str, ...]) -> None:
+    plan = planner().execute(candidate(), MatchingResult((match(MatchStatus.MATCHED, *paths),)))
+
+    assert plan.experience_contexts == ()
+    assert plan.achievement_contexts == ()
+    assert plan.standalone_contexts == (StandaloneOptimizationContext(0, paths),)
 
 
 def test_non_matches_are_ignored_and_zero_matched_is_valid() -> None:

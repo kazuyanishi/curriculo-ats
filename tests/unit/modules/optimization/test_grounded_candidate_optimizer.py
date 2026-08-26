@@ -21,6 +21,7 @@ from resume_ai.modules.optimization.application.planning import (
     CandidateOptimizationPlan,
 )
 from resume_ai.modules.optimization.application.proposals import (
+    CandidateAchievementOptimizationProposal,
     CandidateOptimizationProposal,
 )
 from resume_ai.modules.optimization.application.services import (
@@ -106,6 +107,16 @@ class RecordingApplier:
         return self.output
 
 
+class EmptyAchievementOptimizer:
+    def optimize(self, candidate, matching, plan) -> CandidateAchievementOptimizationProposal:
+        return CandidateAchievementOptimizationProposal()
+
+
+class IdentityAchievementApplier:
+    def apply(self, candidate, proposal) -> Candidate:
+        return candidate
+
+
 class RecordingStandaloneOptimizer:
     def __init__(self, output: Candidate, events: list[str]) -> None:
         self.output = output
@@ -134,7 +145,9 @@ def test_orchestrator_runs_in_order_with_original_inputs() -> None:
     output = GroundedCandidateOptimizer(
         planner,  # type: ignore[arg-type]
         experience_optimizer,  # type: ignore[arg-type]
+        EmptyAchievementOptimizer(),  # type: ignore[arg-type]
         applier,  # type: ignore[arg-type]
+        IdentityAchievementApplier(),  # type: ignore[arg-type]
         standalone,  # type: ignore[arg-type]
     ).optimize(source, matching_result)
 
@@ -185,7 +198,9 @@ def test_orchestrator_is_fail_closed(failing_stage: str) -> None:
         GroundedCandidateOptimizer(
             FailingPlanner(),  # type: ignore[arg-type]
             FailingExperienceOptimizer(),  # type: ignore[arg-type]
+            EmptyAchievementOptimizer(),  # type: ignore[arg-type]
             FailingApplier(),  # type: ignore[arg-type]
+            IdentityAchievementApplier(),  # type: ignore[arg-type]
             FailingStandaloneOptimizer(),  # type: ignore[arg-type]
         ).optimize(source, MatchingResult())
 
@@ -234,7 +249,9 @@ def real_grounded_optimizer(client: FakeStructuredAIClient) -> GroundedCandidate
     return GroundedCandidateOptimizer(
         BuildCandidateOptimizationPlan(MatchingProvenanceGate()),
         AIContextualExperienceOptimizer(client, AISemanticOptimizationTruthGate(client)),
+        EmptyAchievementOptimizer(),
         DeterministicCandidateOptimizationProposalApplier(),
+        IdentityAchievementApplier(),
         GroundedStandaloneCandidateOptimizer(),
     )
 

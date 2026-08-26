@@ -44,12 +44,19 @@ from resume_ai.modules.matching.infrastructure.semantic_refiner import (
 from resume_ai.modules.optimization.application.planning import BuildCandidateOptimizationPlan
 from resume_ai.modules.optimization.application.services import (
     AnalyzeCandidateForJob,
+    DeterministicCandidateAchievementOptimizationProposalApplier,
     DeterministicCandidateOptimizationProposalApplier,
     GroundedCandidateOptimizer,
     GroundedStandaloneCandidateOptimizer,
     OptimizeCandidate,
 )
 from resume_ai.modules.optimization.domain.services import DeterministicCandidateOptimizer
+from resume_ai.modules.optimization.infrastructure import (
+    semantic_achievement_optimization_truth_gate,
+)
+from resume_ai.modules.optimization.infrastructure.contextual_achievement_optimizer import (
+    AIContextualAchievementOptimizer,
+)
 from resume_ai.modules.optimization.infrastructure.contextual_experience_optimizer import (
     AIContextualExperienceOptimizer,
 )
@@ -120,12 +127,20 @@ def build_optimize_candidate() -> OptimizeCandidate:
 
 def build_grounded_optimize_candidate(config: AIConfig) -> OptimizeCandidate:
     client = OpenAIStructuredAIClient(config)
-    truth_gate = AISemanticOptimizationTruthGate(client)
-    experience_optimizer = AIContextualExperienceOptimizer(client, truth_gate)
+    activity_truth_gate = AISemanticOptimizationTruthGate(client)
+    achievement_truth_gate = (
+        semantic_achievement_optimization_truth_gate.AISemanticAchievementOptimizationTruthGate(
+            client
+        )
+    )
+    experience_optimizer = AIContextualExperienceOptimizer(client, activity_truth_gate)
+    achievement_optimizer = AIContextualAchievementOptimizer(client, achievement_truth_gate)
     grounded_optimizer = GroundedCandidateOptimizer(
         planner=BuildCandidateOptimizationPlan(MatchingProvenanceGate()),
         experience_optimizer=experience_optimizer,
+        achievement_optimizer=achievement_optimizer,
         proposal_applier=DeterministicCandidateOptimizationProposalApplier(),
+        achievement_proposal_applier=DeterministicCandidateAchievementOptimizationProposalApplier(),
         standalone_optimizer=GroundedStandaloneCandidateOptimizer(),
     )
     return OptimizeCandidate(grounded_optimizer)

@@ -59,3 +59,45 @@ class CandidateOptimizationProposal:
             raise DomainError("experiences must be a tuple")
         if not all(isinstance(item, ExperienceOptimizationProposal) for item in self.experiences):
             raise DomainError("experiences contains an invalid item")
+
+
+@dataclass(frozen=True, slots=True)
+class OptimizedAchievementStatementProposal:
+    text: str
+    source_paths: tuple[str, ...]
+    target_match_indexes: tuple[int, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.text, str) or not self.text.strip():
+            raise DomainError("text must be a non-blank string")
+        _require_paths(self.source_paths)
+        _require_indexes(self.target_match_indexes)
+
+
+@dataclass(frozen=True, slots=True)
+class ExperienceAchievementOptimizationProposal:
+    experience_index: int
+    statements: tuple[OptimizedAchievementStatementProposal, ...] = ()
+
+    def __post_init__(self) -> None:
+        if type(self.experience_index) is not int or self.experience_index < 0:
+            raise DomainError("experience_index must be a non-negative int")
+        if not isinstance(self.statements, tuple):
+            raise DomainError("statements must be a tuple")
+        if not all(
+            isinstance(item, OptimizedAchievementStatementProposal) for item in self.statements
+        ):
+            raise DomainError("statements contains an invalid item")
+
+
+@dataclass(frozen=True, slots=True)
+class CandidateAchievementOptimizationProposal:
+    experiences: tuple[ExperienceAchievementOptimizationProposal, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.experiences, tuple):
+            raise DomainError("experiences must be a tuple")
+        if not all(
+            isinstance(item, ExperienceAchievementOptimizationProposal) for item in self.experiences
+        ):
+            raise DomainError("experiences contains an invalid item")
