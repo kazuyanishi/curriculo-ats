@@ -229,7 +229,7 @@ O Node 24.19.0 é baixado da distribuição oficial com verificação SHA-256. A
 
 ## Estado atual
 
-Estão implementados matching factual com proveniência, otimização grounded de activities e achievements de experiências com proveniência própria, Truth Gates semânticos, vínculo entre fontes e alvos da otimização e priorização grounded de itens independentes. O projeto não inclui autenticação, banco de dados, histórico de análises, candidatura automática a vagas ou ranking externo.
+Estão implementados matching factual com proveniência, otimização grounded de activities, achievements de experiências e descrições de projetos com proveniência própria, Truth Gates semânticos, vínculo entre fontes e alvos da otimização e priorização grounded de itens independentes. O projeto não inclui autenticação, banco de dados, histórico de análises, candidatura automática a vagas ou ranking externo.
 
 ## Licença
 
