@@ -101,3 +101,43 @@ class CandidateAchievementOptimizationProposal:
             isinstance(item, ExperienceAchievementOptimizationProposal) for item in self.experiences
         ):
             raise DomainError("experiences contains an invalid item")
+
+
+@dataclass(frozen=True, slots=True)
+class OptimizedProjectDescriptionProposal:
+    text: str
+    source_paths: tuple[str, ...]
+    target_match_indexes: tuple[int, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.text, str) or not self.text.strip():
+            raise DomainError("text must be a non-blank string")
+        _require_paths(self.source_paths)
+        _require_indexes(self.target_match_indexes)
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectOptimizationProposal:
+    project_index: int
+    description: OptimizedProjectDescriptionProposal | None = None
+
+    def __post_init__(self) -> None:
+        if type(self.project_index) is not int or self.project_index < 0:
+            raise DomainError("project_index must be a non-negative int")
+        if self.description is not None and not isinstance(
+            self.description, OptimizedProjectDescriptionProposal
+        ):
+            raise DomainError("description contains an invalid item")
+
+
+@dataclass(frozen=True, slots=True)
+class CandidateProjectOptimizationProposal:
+    projects: tuple[ProjectOptimizationProposal, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.projects, tuple):
+            raise DomainError("projects must be a tuple")
+        if not all(isinstance(item, ProjectOptimizationProposal) for item in self.projects):
+            raise DomainError("projects contains an invalid item")
+        if len({item.project_index for item in self.projects}) != len(self.projects):
+            raise DomainError("projects must not contain duplicate project indexes")
