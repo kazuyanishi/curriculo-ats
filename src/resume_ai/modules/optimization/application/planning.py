@@ -7,6 +7,7 @@ from resume_ai.modules.matching.application.provenance import MatchingProvenance
 from resume_ai.modules.matching.domain.entities import MatchingResult, MatchStatus
 
 _ACTIVITY_PATH = re.compile(r"^experiences\[(\d+)]\.activities\[(\d+)]\.description$")
+_ACHIEVEMENT_PATH = re.compile(r"^experiences\[(\d+)]\.achievements\[(\d+)]\.description$")
 
 
 def _require_index(name: str, value: object) -> None:
@@ -45,6 +46,18 @@ class ExperienceOptimizationContext:
 
 
 @dataclass(frozen=True, slots=True)
+class AchievementOptimizationContext:
+    experience_index: int
+    match_indexes: tuple[int, ...]
+    evidence_paths: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        _require_index("experience_index", self.experience_index)
+        _require_indexes("match_indexes", self.match_indexes)
+        _require_paths(self.evidence_paths)
+
+
+@dataclass(frozen=True, slots=True)
 class StandaloneOptimizationContext:
     match_index: int
     evidence_paths: tuple[str, ...]
@@ -57,6 +70,7 @@ class StandaloneOptimizationContext:
 @dataclass(frozen=True, slots=True)
 class CandidateOptimizationPlan:
     experience_contexts: tuple[ExperienceOptimizationContext, ...] = ()
+    achievement_contexts: tuple[AchievementOptimizationContext, ...] = ()
     standalone_contexts: tuple[StandaloneOptimizationContext, ...] = ()
 
     def __post_init__(self) -> None:
@@ -66,6 +80,12 @@ class CandidateOptimizationPlan:
             isinstance(item, ExperienceOptimizationContext) for item in self.experience_contexts
         ):
             raise DomainError("experience_contexts contains an invalid item")
+        if not isinstance(self.achievement_contexts, tuple):
+            raise DomainError("achievement_contexts must be a tuple")
+        if not all(
+            isinstance(item, AchievementOptimizationContext) for item in self.achievement_contexts
+        ):
+            raise DomainError("achievement_contexts contains an invalid item")
         if not isinstance(self.standalone_contexts, tuple):
             raise DomainError("standalone_contexts must be a tuple")
         if not all(
@@ -74,10 +94,10 @@ class CandidateOptimizationPlan:
             raise DomainError("standalone_contexts contains an invalid item")
 
 
-def _experience_index(paths: tuple[str, ...]) -> int | None:
+def _experience_index(paths: tuple[str, ...], path_pattern: re.Pattern[str]) -> int | None:
     indexes = []
     for path in paths:
-        match = _ACTIVITY_PATH.fullmatch(path)
+        match = path_pattern.fullmatch(path)
         if match is None:
             return None
         indexes.append(int(match.group(1)))
@@ -96,14 +116,26 @@ class BuildCandidateOptimizationPlan:
         matching: MatchingResult,
     ) -> CandidateOptimizationPlan:
         self._provenance_gate.validate(candidate, matching)
-        grouped: dict[int, tuple[list[int], list[str]]] = {}
+        activity_grouped: dict[int, tuple[list[int], list[str]]] = {}
+        achievement_grouped: dict[int, tuple[list[int], list[str]]] = {}
         standalone: list[StandaloneOptimizationContext] = []
 
         for match_index, match in enumerate(matching.matches):
             if match.status is not MatchStatus.MATCHED:
                 continue
-            experience_index = _experience_index(match.candidate_evidence_paths)
-            if experience_index is None:
+            activity_experience_index = _experience_index(
+                match.candidate_evidence_paths, _ACTIVITY_PATH
+            )
+            achievement_experience_index = _experience_index(
+                match.candidate_evidence_paths, _ACHIEVEMENT_PATH
+            )
+            if activity_experience_index is not None:
+                grouped = activity_grouped
+                experience_index = activity_experience_index
+            elif achievement_experience_index is not None:
+                grouped = achievement_grouped
+                experience_index = achievement_experience_index
+            else:
                 standalone.append(
                     StandaloneOptimizationContext(match_index, match.candidate_evidence_paths)
                 )
@@ -117,7 +149,11 @@ class BuildCandidateOptimizationPlan:
         return CandidateOptimizationPlan(
             experience_contexts=tuple(
                 ExperienceOptimizationContext(index, tuple(indexes), tuple(paths))
-                for index, (indexes, paths) in grouped.items()
+                for index, (indexes, paths) in activity_grouped.items()
+            ),
+            achievement_contexts=tuple(
+                AchievementOptimizationContext(index, tuple(indexes), tuple(paths))
+                for index, (indexes, paths) in achievement_grouped.items()
             ),
             standalone_contexts=tuple(standalone),
         )

@@ -1,7 +1,7 @@
 import re
 from dataclasses import dataclass, replace
 
-from resume_ai.modules.candidate.domain.entities import Activity, Candidate
+from resume_ai.modules.candidate.domain.entities import Achievement, Activity, Candidate
 from resume_ai.modules.jobs.application.services import ExtractJobCriteria
 from resume_ai.modules.jobs.domain.entities import JobCriteria, JobPosting
 from resume_ai.modules.matching.application.catalog import build_candidate_evidence_catalog
@@ -20,17 +20,22 @@ from resume_ai.modules.optimization.application.planning import (
     CandidateOptimizationPlan,
 )
 from resume_ai.modules.optimization.application.ports import (
+    CandidateAchievementOptimizationProposalApplier,
+    CandidateAchievementOptimizer,
     CandidateExperienceOptimizer,
     CandidateOptimizationProposalApplier,
     CandidateOptimizer,
     CandidateStandaloneOptimizer,
 )
 from resume_ai.modules.optimization.application.proposals import (
+    CandidateAchievementOptimizationProposal,
     CandidateOptimizationProposal,
+    OptimizedAchievementStatementProposal,
     OptimizedExperienceStatementProposal,
 )
 
 _ACTIVITY_PATH = re.compile(r"^experiences\[(\d+)]\.activities\[(\d+)]\.description$")
+_ACHIEVEMENT_PATH = re.compile(r"^experiences\[(\d+)]\.achievements\[(\d+)]\.description$")
 _STANDALONE_PATH = re.compile(
     r"^(skills|technologies|tools|languages|certifications)\[(\d+)]\.[^.]+$"
 )
@@ -126,6 +131,97 @@ class DeterministicCandidateOptimizationProposalApplier:
         )
 
 
+class DeterministicCandidateAchievementOptimizationProposalApplier:
+    def apply(
+        self,
+        candidate: Candidate,
+        proposal: CandidateAchievementOptimizationProposal,
+    ) -> Candidate:
+        by_experience_index = self._by_experience_index(candidate, proposal)
+        if not by_experience_index:
+            return candidate
+
+        experiences = tuple(
+            replace(
+                experience,
+                achievements=self._apply_achievements(
+                    experience.achievements, by_experience_index[index]
+                ),
+            )
+            if index in by_experience_index
+            else experience
+            for index, experience in enumerate(candidate.experiences)
+        )
+        return replace(candidate, experiences=experiences)
+
+    @staticmethod
+    def _by_experience_index(
+        candidate: Candidate,
+        proposal: CandidateAchievementOptimizationProposal,
+    ) -> dict[int, tuple[tuple[int, frozenset[int], OptimizedAchievementStatementProposal], ...]]:
+        by_experience_index = {}
+        seen_indexes: set[int] = set()
+        get_achievement_indexes = (
+            DeterministicCandidateAchievementOptimizationProposalApplier._achievement_indexes
+        )
+        for experience_proposal in proposal.experiences:
+            index = experience_proposal.experience_index
+            if not 0 <= index < len(candidate.experiences) or index in seen_indexes:
+                raise OptimizationProposalGroundingError()
+            seen_indexes.add(index)
+            if experience_proposal.statements:
+                consumed: set[int] = set()
+                replacements = []
+                for statement in experience_proposal.statements:
+                    achievement_indexes = get_achievement_indexes(candidate, index, statement)
+                    if consumed.intersection(achievement_indexes):
+                        raise OptimizationProposalGroundingError()
+                    consumed.update(achievement_indexes)
+                    replacements.append((min(achievement_indexes), achievement_indexes, statement))
+                by_experience_index[index] = tuple(replacements)
+        return by_experience_index
+
+    @staticmethod
+    def _achievement_indexes(
+        candidate: Candidate,
+        experience_index: int,
+        statement: OptimizedAchievementStatementProposal,
+    ) -> frozenset[int]:
+        indexes = set()
+        for path in statement.source_paths:
+            match = _ACHIEVEMENT_PATH.fullmatch(path)
+            if match is None or int(match.group(1)) != experience_index:
+                raise OptimizationProposalGroundingError()
+            achievement_index = int(match.group(2))
+            if (
+                not 0
+                <= achievement_index
+                < len(candidate.experiences[experience_index].achievements)
+            ):
+                raise OptimizationProposalGroundingError()
+            indexes.add(achievement_index)
+        return frozenset(indexes)
+
+    @staticmethod
+    def _apply_achievements(
+        achievements: tuple[Achievement, ...],
+        replacements: tuple[tuple[int, frozenset[int], OptimizedAchievementStatementProposal], ...],
+    ) -> tuple[Achievement, ...]:
+        statements_by_first_index = {index: statement for index, _, statement in replacements}
+        consumed_indexes = {
+            achievement_index
+            for _, achievement_indexes, _ in replacements
+            for achievement_index in achievement_indexes
+        }
+        return tuple(
+            Achievement(statements_by_first_index[index].text)
+            if index in statements_by_first_index
+            else achievement
+            for index, achievement in enumerate(achievements)
+            if index not in consumed_indexes or index in statements_by_first_index
+        )
+
+
 class GroundedStandaloneCandidateOptimizer:
     def optimize(self, candidate: Candidate, plan: CandidateOptimizationPlan) -> Candidate:
         catalog_paths = {item.path for item in build_candidate_evidence_catalog(candidate)}
@@ -165,19 +261,27 @@ class GroundedCandidateOptimizer:
         self,
         planner: BuildCandidateOptimizationPlan,
         experience_optimizer: CandidateExperienceOptimizer,
+        achievement_optimizer: CandidateAchievementOptimizer,
         proposal_applier: CandidateOptimizationProposalApplier,
+        achievement_proposal_applier: CandidateAchievementOptimizationProposalApplier,
         standalone_optimizer: CandidateStandaloneOptimizer,
     ) -> None:
         self._planner = planner
         self._experience_optimizer = experience_optimizer
+        self._achievement_optimizer = achievement_optimizer
         self._proposal_applier = proposal_applier
+        self._achievement_proposal_applier = achievement_proposal_applier
         self._standalone_optimizer = standalone_optimizer
 
     def optimize(self, candidate: Candidate, matching: MatchingResult) -> Candidate:
         plan = self._planner.execute(candidate, matching)
-        proposal = self._experience_optimizer.optimize(candidate, matching, plan)
-        experience_optimized_candidate = self._proposal_applier.apply(candidate, proposal)
-        return self._standalone_optimizer.optimize(experience_optimized_candidate, plan)
+        activity_proposal = self._experience_optimizer.optimize(candidate, matching, plan)
+        achievement_proposal = self._achievement_optimizer.optimize(candidate, matching, plan)
+        after_activities = self._proposal_applier.apply(candidate, activity_proposal)
+        after_achievements = self._achievement_proposal_applier.apply(
+            after_activities, achievement_proposal
+        )
+        return self._standalone_optimizer.optimize(after_achievements, plan)
 
 
 class OptimizeCandidate:
