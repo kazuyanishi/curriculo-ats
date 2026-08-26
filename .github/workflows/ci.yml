@@ -92,6 +92,23 @@ jobs:
           test "$engine_node" = "$expected_node"
       - name: Install frontend dependencies
         run: npm ci
+      - name: Security audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          audit_file="$(mktemp)"
+          trap 'rm -f "$audit_file"' EXIT
+          npm audit --audit-level=low
+          npm audit --json > "$audit_file"
+          node -e '
+            const audit = require(process.argv[1]);
+            const vulnerabilities = audit.metadata.vulnerabilities;
+            const severities = ["info", "low", "moderate", "high", "critical"];
+            if (vulnerabilities.total !== 0 || severities.some((severity) => vulnerabilities[severity] !== 0)) {
+              console.error("npm audit reported vulnerabilities", vulnerabilities);
+              process.exit(1);
+            }
+          ' "$audit_file"
       - name: TypeScript
         run: npx tsc --noEmit
       - name: Lint

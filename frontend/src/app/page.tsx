@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import { AnalysisResult } from "../components/AnalysisResult";
 import { CandidateForm } from "../components/CandidateForm";
 import { CandidateImportPanel } from "../components/CandidateImportPanel";
@@ -63,17 +63,19 @@ export default function Home() {
   useEffect(() => {
     const storedCandidate = loadStoredCandidate();
     const storedReview = loadStoredCandidateImportReview();
-    if (storedCandidate) {
-      setCandidate(storedCandidate);
-      if (storedReview) {
-        setImportIssues(storedReview.issues);
-        setImportReviewPaths(storedReview.review_paths);
+    startTransition(() => {
+      if (storedCandidate) {
+        setCandidate(storedCandidate);
+        if (storedReview) {
+          setImportIssues(storedReview.issues);
+          setImportReviewPaths(storedReview.review_paths);
+        }
+      } else if (storedReview) {
+        clearStoredCandidateImportReview();
       }
-    } else if (storedReview) {
-      clearStoredCandidateImportReview();
-    }
-    setCandidateHydrated(true);
-    setImportReviewHydrated(true);
+      setCandidateHydrated(true);
+      setImportReviewHydrated(true);
+    });
   }, []);
 
   useEffect(() => {
