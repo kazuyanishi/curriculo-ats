@@ -46,6 +46,7 @@ from resume_ai.modules.optimization.application.services import (
     AnalyzeCandidateForJob,
     DeterministicCandidateAchievementOptimizationProposalApplier,
     DeterministicCandidateOptimizationProposalApplier,
+    DeterministicCandidateProjectOptimizationProposalApplier,
     GroundedCandidateOptimizer,
     GroundedStandaloneCandidateOptimizer,
     OptimizeCandidate,
@@ -60,8 +61,14 @@ from resume_ai.modules.optimization.infrastructure.contextual_achievement_optimi
 from resume_ai.modules.optimization.infrastructure.contextual_experience_optimizer import (
     AIContextualExperienceOptimizer,
 )
+from resume_ai.modules.optimization.infrastructure.contextual_project_optimizer import (
+    AIContextualProjectOptimizer,
+)
 from resume_ai.modules.optimization.infrastructure.semantic_optimization_truth_gate import (
     AISemanticOptimizationTruthGate,
+)
+from resume_ai.modules.optimization.infrastructure.semantic_project_optimization_truth_gate import (
+    AISemanticProjectOptimizationTruthGate,
 )
 
 
@@ -133,14 +140,18 @@ def build_grounded_optimize_candidate(config: AIConfig) -> OptimizeCandidate:
             client
         )
     )
+    project_truth_gate = AISemanticProjectOptimizationTruthGate(client)
     experience_optimizer = AIContextualExperienceOptimizer(client, activity_truth_gate)
     achievement_optimizer = AIContextualAchievementOptimizer(client, achievement_truth_gate)
+    project_optimizer = AIContextualProjectOptimizer(client, project_truth_gate)
     grounded_optimizer = GroundedCandidateOptimizer(
         planner=BuildCandidateOptimizationPlan(MatchingProvenanceGate()),
         experience_optimizer=experience_optimizer,
         achievement_optimizer=achievement_optimizer,
+        project_optimizer=project_optimizer,
         proposal_applier=DeterministicCandidateOptimizationProposalApplier(),
         achievement_proposal_applier=DeterministicCandidateAchievementOptimizationProposalApplier(),
+        project_proposal_applier=DeterministicCandidateProjectOptimizationProposalApplier(),
         standalone_optimizer=GroundedStandaloneCandidateOptimizer(),
     )
     return OptimizeCandidate(grounded_optimizer)
