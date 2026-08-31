@@ -1,11 +1,20 @@
 import pytest
 
-from resume_ai.modules.candidate.domain.entities import Candidate, ContactInfo, PersonalInfo
+from resume_ai.modules.candidate.domain.entities import (
+    Candidate,
+    ContactInfo,
+    PersonalInfo,
+    Project,
+)
 from resume_ai.modules.matching.domain.entities import MatchingResult
-from resume_ai.modules.optimization.application.planning import CandidateOptimizationPlan
+from resume_ai.modules.optimization.application.planning import (
+    CandidateOptimizationPlan,
+    ProjectOptimizationContext,
+)
 from resume_ai.modules.optimization.application.proposals import (
     CandidateAchievementOptimizationProposal,
     CandidateOptimizationProposal,
+    CandidateProjectOptimizationProposal,
 )
 from resume_ai.modules.optimization.application.services import GroundedCandidateOptimizer
 
@@ -57,6 +66,19 @@ def test_pipeline_orders_stages_and_gives_both_ai_optimizers_the_original_candid
             assert received_candidate is after_activities
             return after_achievements
 
+    class ProjectOptimizer:
+        def optimize(self, received_candidate, matching, received_plan):
+            events.append("project_optimizer")
+            assert received_candidate is source
+            assert received_plan is plan
+            return CandidateProjectOptimizationProposal()
+
+    class ProjectApplier:
+        def apply(self, received_candidate, proposal):
+            events.append("project_applier")
+            assert received_candidate is after_achievements
+            return after_achievements
+
     class StandaloneOptimizer:
         def optimize(self, received_candidate, received_plan):
             events.append("standalone_optimizer")
@@ -71,6 +93,8 @@ def test_pipeline_orders_stages_and_gives_both_ai_optimizers_the_original_candid
         ActivityApplier(),  # type: ignore[arg-type]
         AchievementApplier(),  # type: ignore[arg-type]
         StandaloneOptimizer(),  # type: ignore[arg-type]
+        ProjectOptimizer(),  # type: ignore[arg-type]
+        ProjectApplier(),  # type: ignore[arg-type]
     ).optimize(source, MatchingResult())
 
     assert result is final
@@ -78,8 +102,10 @@ def test_pipeline_orders_stages_and_gives_both_ai_optimizers_the_original_candid
         "planner",
         "activity_optimizer",
         "achievement_optimizer",
+        "project_optimizer",
         "activity_applier",
         "achievement_applier",
+        "project_applier",
         "standalone_optimizer",
     ]
 
@@ -117,6 +143,16 @@ def test_pipeline_stops_before_later_stage_when_achievement_stage_fails(failure:
                 raise RuntimeError("failure")
             return candidate
 
+    class ProjectOptimizer:
+        def optimize(self, candidate, matching, plan):
+            events.append("project_optimizer")
+            return CandidateProjectOptimizationProposal()
+
+    class ProjectApplier:
+        def apply(self, candidate, proposal):
+            events.append("project_applier")
+            return candidate
+
     class StandaloneOptimizer:
         def optimize(self, candidate, plan):
             events.append("standalone_optimizer")
@@ -130,6 +166,8 @@ def test_pipeline_stops_before_later_stage_when_achievement_stage_fails(failure:
             ActivityApplier(),  # type: ignore[arg-type]
             AchievementApplier(),  # type: ignore[arg-type]
             StandaloneOptimizer(),  # type: ignore[arg-type]
+            ProjectOptimizer(),  # type: ignore[arg-type]
+            ProjectApplier(),  # type: ignore[arg-type]
         ).optimize(candidate(), MatchingResult())
 
     assert (
@@ -140,8 +178,68 @@ def test_pipeline_stops_before_later_stage_when_achievement_stage_fails(failure:
                 "planner",
                 "activity_optimizer",
                 "achievement_optimizer",
+                "project_optimizer",
                 "activity_applier",
                 "achievement_applier",
             ],
         }[failure]
     )
+
+
+def test_project_only_plan_always_invokes_project_optimizer_and_applier() -> None:
+    events: list[str] = []
+    source = Candidate(
+        PersonalInfo("Jane Doe", "Curitiba", "PR", "Brazil"),
+        ContactInfo("jane@example.test", "+55"),
+        projects=(Project("Resume AI", "Python application."),),
+    )
+    plan = CandidateOptimizationPlan(
+        project_contexts=(ProjectOptimizationContext(0, (0,), ("projects[0].description",)),)
+    )
+
+    class Planner:
+        def execute(self, candidate, matching):
+            return plan
+
+    class EmptyActivityOptimizer:
+        def optimize(self, candidate, matching, plan):
+            return CandidateOptimizationProposal()
+
+    class EmptyAchievementOptimizer:
+        def optimize(self, candidate, matching, plan):
+            return CandidateAchievementOptimizationProposal()
+
+    class IdentityApplier:
+        def apply(self, candidate, proposal):
+            return candidate
+
+    class ProjectOptimizer:
+        def optimize(self, received_candidate, matching, received_plan):
+            events.append("project_optimizer")
+            assert received_candidate is source
+            assert received_plan is plan
+            return CandidateProjectOptimizationProposal()
+
+    class ProjectApplier:
+        def apply(self, received_candidate, proposal):
+            events.append("project_applier")
+            assert received_candidate is source
+            return received_candidate
+
+    class IdentityStandaloneOptimizer:
+        def optimize(self, candidate, plan):
+            return candidate
+
+    result = GroundedCandidateOptimizer(
+        Planner(),  # type: ignore[arg-type]
+        EmptyActivityOptimizer(),  # type: ignore[arg-type]
+        EmptyAchievementOptimizer(),  # type: ignore[arg-type]
+        IdentityApplier(),  # type: ignore[arg-type]
+        IdentityApplier(),  # type: ignore[arg-type]
+        IdentityStandaloneOptimizer(),  # type: ignore[arg-type]
+        ProjectOptimizer(),  # type: ignore[arg-type]
+        ProjectApplier(),  # type: ignore[arg-type]
+    ).optimize(source, MatchingResult())
+
+    assert result is source
+    assert events == ["project_optimizer", "project_applier"]

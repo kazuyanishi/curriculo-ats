@@ -294,8 +294,8 @@ class GroundedCandidateOptimizer:
         proposal_applier: CandidateOptimizationProposalApplier,
         achievement_proposal_applier: CandidateAchievementOptimizationProposalApplier,
         standalone_optimizer: CandidateStandaloneOptimizer,
-        project_optimizer: CandidateProjectOptimizer | None = None,
-        project_proposal_applier: CandidateProjectOptimizationProposalApplier | None = None,
+        project_optimizer: CandidateProjectOptimizer,
+        project_proposal_applier: CandidateProjectOptimizationProposalApplier,
     ) -> None:
         self._planner = planner
         self._experience_optimizer = experience_optimizer
@@ -310,20 +310,12 @@ class GroundedCandidateOptimizer:
         plan = self._planner.execute(candidate, matching)
         activity_proposal = self._experience_optimizer.optimize(candidate, matching, plan)
         achievement_proposal = self._achievement_optimizer.optimize(candidate, matching, plan)
-        project_proposal = (
-            self._project_optimizer.optimize(candidate, matching, plan)
-            if self._project_optimizer is not None
-            else CandidateProjectOptimizationProposal()
-        )
+        project_proposal = self._project_optimizer.optimize(candidate, matching, plan)
         after_activities = self._proposal_applier.apply(candidate, activity_proposal)
         after_achievements = self._achievement_proposal_applier.apply(
             after_activities, achievement_proposal
         )
-        after_projects = (
-            self._project_proposal_applier.apply(after_achievements, project_proposal)
-            if self._project_proposal_applier is not None
-            else after_achievements
-        )
+        after_projects = self._project_proposal_applier.apply(after_achievements, project_proposal)
         return self._standalone_optimizer.optimize(after_projects, plan)
 
 
