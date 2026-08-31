@@ -23,6 +23,7 @@ from resume_ai.modules.optimization.application.planning import (
 from resume_ai.modules.optimization.application.proposals import (
     CandidateAchievementOptimizationProposal,
     CandidateOptimizationProposal,
+    CandidateProjectOptimizationProposal,
 )
 from resume_ai.modules.optimization.application.services import (
     DeterministicCandidateOptimizationProposalApplier,
@@ -117,6 +118,16 @@ class IdentityAchievementApplier:
         return candidate
 
 
+class EmptyProjectOptimizer:
+    def optimize(self, candidate, matching, plan) -> CandidateProjectOptimizationProposal:
+        return CandidateProjectOptimizationProposal()
+
+
+class IdentityProjectApplier:
+    def apply(self, candidate, proposal) -> Candidate:
+        return candidate
+
+
 class RecordingStandaloneOptimizer:
     def __init__(self, output: Candidate, events: list[str]) -> None:
         self.output = output
@@ -149,6 +160,8 @@ def test_orchestrator_runs_in_order_with_original_inputs() -> None:
         applier,  # type: ignore[arg-type]
         IdentityAchievementApplier(),  # type: ignore[arg-type]
         standalone,  # type: ignore[arg-type]
+        EmptyProjectOptimizer(),  # type: ignore[arg-type]
+        IdentityProjectApplier(),  # type: ignore[arg-type]
     ).optimize(source, matching_result)
 
     assert events == ["planner", "experience_optimizer", "applier", "standalone"]
@@ -202,6 +215,8 @@ def test_orchestrator_is_fail_closed(failing_stage: str) -> None:
             FailingApplier(),  # type: ignore[arg-type]
             IdentityAchievementApplier(),  # type: ignore[arg-type]
             FailingStandaloneOptimizer(),  # type: ignore[arg-type]
+            EmptyProjectOptimizer(),  # type: ignore[arg-type]
+            IdentityProjectApplier(),  # type: ignore[arg-type]
         ).optimize(source, MatchingResult())
 
     assert (
@@ -253,6 +268,8 @@ def real_grounded_optimizer(client: FakeStructuredAIClient) -> GroundedCandidate
         DeterministicCandidateOptimizationProposalApplier(),
         IdentityAchievementApplier(),
         GroundedStandaloneCandidateOptimizer(),
+        EmptyProjectOptimizer(),
+        IdentityProjectApplier(),
     )
 
 

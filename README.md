@@ -201,7 +201,7 @@ python -m pip check
 python -m pytest
 ```
 
-A baseline atual é **1245 testes passando**.
+A baseline atual é **1293 testes passando**.
 
 Frontend:
 
