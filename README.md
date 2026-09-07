@@ -175,11 +175,13 @@ O FastAPI expõe os endpoints sob o prefixo `/api/v1`:
 
 O frontend chama seus Route Handlers em `/api/*`; eles encaminham as requisições ao FastAPI. Erros de configuração da IA retornam `503`; falhas de integração externa retornam `502`; e conteúdo ou dados que não passam pela validação necessária retornam `422` quando aplicável.
 
+O currículo importado e a vaga preenchida ficam salvos no `localStorage` do navegador. Assim, depois da primeira importação, é possível voltar à aplicação, ajustar uma vaga e executar novamente a análise e a otimização sem reenviar o arquivo. O frontend também expõe `POST /api/job/fetch`: ele lê título, empresa, localização e descrição de páginas de vagas que permitem acesso automático. Quando um site bloqueia a leitura ou não publica algum campo, o formulário informa exatamente o que faltou para preenchimento manual.
+
 ## Fluxo da aplicação
 
-1. Importe um currículo PDF/DOCX ou preencha o Candidate manualmente.
+1. Importe um currículo PDF/DOCX ou preencha o Candidate manualmente; os dados ficam salvos no navegador.
 2. Revise os dados importados e eventuais avisos.
-3. Informe a descrição da vaga.
+3. Cole o link da vaga e use a busca automática, completando manualmente os campos que o site não disponibilizar; também é possível colar a descrição diretamente.
 4. A IA estrutura critérios da vaga; o pipeline executa matching, score, cobertura e análise de gaps.
 5. A otimização grounded reorganiza apenas conteúdo sustentado por evidência do Candidate.
 6. Consulte correspondências, lacunas e critérios não avaliáveis; então baixe o Candidate otimizado em DOCX ou PDF.

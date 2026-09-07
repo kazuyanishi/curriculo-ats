@@ -57,3 +57,15 @@ export async function importCandidateResume(file: File): Promise<CandidateImport
   if (!response.ok) throw await responseError(response);
   return await response.json() as CandidateImportDraft;
 }
+
+export type JobFetchResult = { job: Job; warnings: string[] };
+
+export async function fetchJobFromUrl(url: string): Promise<JobFetchResult> {
+  const response = await fetch("/api/job/fetch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  if (!response.ok) throw await responseError(response);
+  return await response.json() as JobFetchResult;
+}
