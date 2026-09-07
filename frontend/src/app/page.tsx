@@ -30,6 +30,27 @@ function candidateHasData(candidate: Candidate): boolean {
   return personal || contact || links || collections.some(items => items.length > 0);
 }
 
+function importSummary(candidate: Candidate): { mapped: string[]; missing: string[] } {
+  const mapped: string[] = [];
+  const missing: string[] = [];
+  const fields: [string, string][] = [
+    ["Nome completo", candidate.personal_info.full_name], ["Cidade", candidate.personal_info.city],
+    ["Estado", candidate.personal_info.state], ["País", candidate.personal_info.country],
+    ["E-mail", candidate.contact_info.email], ["Telefone", candidate.contact_info.phone],
+    ["LinkedIn", candidate.professional_links.linkedin ?? ""], ["GitHub", candidate.professional_links.github ?? ""],
+    ["Portfólio", candidate.professional_links.portfolio ?? ""],
+  ];
+  for (const [label, value] of fields) (value.trim() ? mapped : missing).push(label);
+  const collections: [string, number][] = [
+    ["Experiências", candidate.experiences.length], ["Formações", candidate.education.length],
+    ["Competências", candidate.skills.length], ["Tecnologias", candidate.technologies.length],
+    ["Ferramentas", candidate.tools.length], ["Idiomas", candidate.languages.length],
+    ["Certificações", candidate.certifications.length], ["Projetos", candidate.projects.length],
+  ];
+  for (const [label, count] of collections) (count ? mapped : missing).push(count ? `${label} (${count})` : label);
+  return { mapped, missing };
+}
+
 function importErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : "Não foi possível importar o currículo.";
   const messages: Record<string, string> = {
@@ -39,8 +60,13 @@ function importErrorMessage(error: unknown): string {
     "Could not extract text from resume": "Não foi possível ler o currículo enviado.",
     "Resume contains no extractable text": "Não foi possível encontrar texto no currículo. PDFs escaneados ainda não são suportados.",
     "Resume extraction could not be validated": "Não foi possível validar com segurança os dados extraídos.",
+    "AI configuration unavailable": "A configuração da IA está incompleta. Defina RESUME_AI_API_KEY e RESUME_AI_MODEL no backend.",
+    "AI integration failed": "A IA recebeu o currículo, mas não conseguiu gerar os dados. Tente novamente ou verifique o modelo configurado.",
+    "Backend indisponível.": "O backend não está acessível. Inicie a tarefa ATS: backend no VS Code e tente novamente.",
   };
-  return messages[message] ?? message;
+  if (messages[message]) return messages[message];
+  if (/failed to fetch|networkerror|network request failed/i.test(message)) return "Não foi possível conectar ao backend. Verifique se a tarefa ATS: backend está em execução.";
+  return message || "Não foi possível importar o currículo. Verifique o arquivo e tente novamente.";
 }
 
 export default function Home() {
@@ -56,6 +82,8 @@ export default function Home() {
   const [importError, setImportError] = useState("");
   const [importIssues, setImportIssues] = useState<CandidateImportIssue[]>([]);
   const [importReviewPaths, setImportReviewPaths] = useState<string[]>([]);
+  const [importMappedSummary, setImportMappedSummary] = useState<string[]>([]);
+  const [importMissingSummary, setImportMissingSummary] = useState<string[]>([]);
   const importInFlightRef = useRef(false);
   const analysisInFlightRef = useRef(false);
   const resultRef = useRef<HTMLDivElement>(null);
@@ -135,6 +163,9 @@ export default function Home() {
       setCandidate(editResult.candidate);
       setImportIssues(editResult.issues);
       setImportReviewPaths(editResult.review_paths);
+      const summary = importSummary(editResult.candidate);
+      setImportMappedSummary(summary.mapped);
+      setImportMissingSummary(summary.missing);
       setImportState("success");
       setAnalysis(null); setAnalysisState("idle"); setErrorMessage(""); setValidationIssues([]);
     } catch (error) {
@@ -143,5 +174,5 @@ export default function Home() {
   };
 
   const warningsPending = importIssues.length > 0 || importReviewPaths.length > 0;
-  return <><AppHeader /><main className="mx-auto max-w-[1400px] px-5 pb-16 pt-10 lg:px-10"><div className="mb-10 max-w-3xl"><StepIndicator step={analysisState === "success" ? 3 : 1} /><p className="mt-8 text-sm font-bold uppercase tracking-[0.18em] text-indigo-600">Seu próximo passo profissional</p><h1 className="mt-3 text-4xl font-black tracking-tight text-ink sm:text-6xl">Currículo alinhado à vaga,<br /><span className="text-indigo-600">sem inventar experiência.</span></h1><p className="mt-5 max-w-2xl text-lg leading-8 text-slate-500">Compare seu currículo com uma vaga, identifique lacunas e gere uma versão otimizada para sistemas ATS.</p></div><div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.8fr)_minmax(320px,1fr)]"><div className="space-y-4"><CandidateImportPanel loading={importState === "loading"} disabled={!candidateHydrated || !importReviewHydrated || analysisState === "loading"} success={importState === "success"} errorMessage={importError} issues={importIssues} reviewPaths={importReviewPaths} onFileSelected={handleImport} onAcknowledgeReview={() => { setImportIssues([]); setImportReviewPaths([]); }} /><CandidateForm candidate={candidate} setCandidate={setCandidate} onClear={clearCandidate} /></div><div><JobForm job={job} setJob={setJob} onAnalyze={submit} loading={analysisState === "loading"} disabled={!candidateHydrated || !importReviewHydrated || importState === "loading" || warningsPending} />{analysisState === "error" && <div role="alert" className="mt-3 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-800"><p className="font-bold">{validationIssues.length > 0 ? "Não foi possível analisar. Corrija os campos abaixo:" : "Não foi possível analisar os dados."}</p>{validationIssues.length > 0 ? <ul className="mt-2 list-disc space-y-1 pl-5">{validationIssues.map(issue => <li key={issue.path}>{issue.message}</li>)}</ul> : <p className="mt-1">{errorMessage}</p>}</div>}</div></div><div ref={resultRef}>{analysis ? <AnalysisResult analysis={analysis} /> : <EmptyAnalysisState />}</div></main></>;
+  return <><AppHeader /><main className="mx-auto max-w-[1400px] px-5 pb-16 pt-10 lg:px-10"><div className="mb-10 max-w-3xl"><StepIndicator step={analysisState === "success" ? 3 : 1} /><p className="mt-8 text-sm font-bold uppercase tracking-[0.18em] text-indigo-600">Seu próximo passo profissional</p><h1 className="mt-3 text-4xl font-black tracking-tight text-ink sm:text-6xl">Currículo alinhado à vaga,<br /><span className="text-indigo-600">sem inventar experiência.</span></h1><p className="mt-5 max-w-2xl text-lg leading-8 text-slate-500">Compare seu currículo com uma vaga, identifique lacunas e gere uma versão otimizada para sistemas ATS.</p></div><div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.8fr)_minmax(320px,1fr)]"><div className="space-y-4"><CandidateImportPanel loading={importState === "loading"} disabled={!candidateHydrated || !importReviewHydrated || analysisState === "loading"} success={importState === "success"} errorMessage={importError} issues={importIssues} reviewPaths={importReviewPaths} mappedSummary={importMappedSummary} missingSummary={importMissingSummary} onFileSelected={handleImport} onAcknowledgeReview={() => { setImportIssues([]); setImportReviewPaths([]); }} /><CandidateForm candidate={candidate} setCandidate={setCandidate} onClear={clearCandidate} /></div><div><JobForm job={job} setJob={setJob} onAnalyze={submit} loading={analysisState === "loading"} disabled={!candidateHydrated || !importReviewHydrated || importState === "loading" || warningsPending} />{analysisState === "error" && <div role="alert" className="mt-3 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-800"><p className="font-bold">{validationIssues.length > 0 ? "Não foi possível analisar. Corrija os campos abaixo:" : "Não foi possível analisar os dados."}</p>{validationIssues.length > 0 ? <ul className="mt-2 list-disc space-y-1 pl-5">{validationIssues.map(issue => <li key={issue.path}>{issue.message}</li>)}</ul> : <p className="mt-1">{errorMessage}</p>}</div>}</div></div><div ref={resultRef}>{analysis ? <AnalysisResult analysis={analysis} /> : <EmptyAnalysisState />}</div></main></>;
 }

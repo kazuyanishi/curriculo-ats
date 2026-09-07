@@ -1,0 +1,26 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "ATS: backend (porta 8001)",
+      "type": "shell",
+      "command": "bash iniciar-backend-linux.sh",
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "ATS: frontend (porta 3000)",
+      "type": "shell",
+      "command": "RESUME_AI_API_URL=http://127.0.0.1:8001 PATH=/home/pdm/.local/share/dev-sdks/node/bin:$PATH npm run dev -- --hostname 127.0.0.1 --port 3000",
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "ATS: iniciar backend + frontend",
+      "dependsOn": ["ATS: backend (porta 8001)", "ATS: frontend (porta 3000)"],
+      "dependsOrder": "parallel"
+    }
+  ]
+}
