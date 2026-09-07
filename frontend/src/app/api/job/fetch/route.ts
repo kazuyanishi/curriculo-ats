@@ -108,7 +108,13 @@ export async function POST(request: Request) {
   } catch { return NextResponse.json({ detail: "Use uma URL HTTP ou HTTPS válida." }, { status: 400 }); }
   try {
     const response = await fetch(target, { headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": "ResumeAI/1.0 job-reader" }, signal: AbortSignal.timeout(10_000), cache: "no-store" });
-    if (!response.ok) return NextResponse.json({ detail: `A página respondeu com HTTP ${response.status}. Cole a descrição manualmente.` }, { status: 422 });
+    if (!response.ok) {
+      const isIndeed = /(^|\.)indeed\./i.test(target.hostname);
+      const detail = response.status === 403 && isIndeed
+        ? "O Indeed bloqueou a leitura automática desta vaga. Abra o link no navegador, copie a descrição e cole no campo abaixo."
+        : `A página respondeu com HTTP ${response.status}. Cole a descrição manualmente.`;
+      return NextResponse.json({ detail }, { status: 422 });
+    }
     const contentLength = Number(response.headers.get("content-length") ?? 0);
     if (contentLength > MAX_PAGE_BYTES) return NextResponse.json({ detail: "A página é grande demais para leitura automática. Cole a descrição manualmente." }, { status: 413 });
     const bytes = await response.arrayBuffer();
