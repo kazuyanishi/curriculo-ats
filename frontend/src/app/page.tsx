@@ -8,6 +8,7 @@ import { EmptyAnalysisState } from "../components/EmptyAnalysisState";
 import { JobForm } from "../components/JobForm";
 import { AppHeader, StepIndicator } from "../components/ui";
 import { analyzeCandidate, fetchJobFromUrl, importCandidateResume } from "../lib/api";
+import { importJobFromClipboard } from "../lib/indeedBrowserBridge";
 import { candidateFromImportDraft } from "../lib/candidateImport";
 import { CandidateValidationIssue, validateCandidateForAnalysis } from "../lib/candidateValidation";
 import {
@@ -92,6 +93,8 @@ export default function Home() {
   const [jobFetchState, setJobFetchState] = useState<JobFetchState>("idle");
   const [jobFetchError, setJobFetchError] = useState("");
   const [jobFetchWarnings, setJobFetchWarnings] = useState<string[]>([]);
+  const [browserImporting, setBrowserImporting] = useState(false);
+  const [browserImportError, setBrowserImportError] = useState("");
   const importInFlightRef = useRef(false);
   const analysisInFlightRef = useRef(false);
   const resultRef = useRef<HTMLDivElement>(null);
@@ -164,6 +167,20 @@ export default function Home() {
     }
   };
 
+  const handleImportFromClipboard = async () => {
+    if (browserImporting || analysisInFlightRef.current || importInFlightRef.current) return;
+    setBrowserImporting(true); setBrowserImportError(""); setJobFetchWarnings([]);
+    try {
+      const result = await importJobFromClipboard(job);
+      setJob(result.job);
+      setJobFetchError("");
+      setJobFetchWarnings(result.warnings);
+      setJobFetchState("success");
+    } catch (error) {
+      setBrowserImportError(error instanceof Error ? error.message : "Não foi possível importar a vaga copiada.");
+    } finally { setBrowserImporting(false); }
+  };
+
   const submit = async () => {
     if (!candidateHydrated || !importReviewHydrated || analysisInFlightRef.current || importInFlightRef.current) return;
     if (importIssues.length > 0 || importReviewPaths.length > 0) {
@@ -210,5 +227,5 @@ export default function Home() {
   };
 
   const warningsPending = importIssues.length > 0 || importReviewPaths.length > 0;
-  return <><AppHeader /><main className="mx-auto max-w-[1400px] px-5 pb-16 pt-10 lg:px-10"><div className="mb-10 max-w-3xl"><StepIndicator step={analysisState === "success" ? 3 : 1} /><p className="mt-8 text-sm font-bold uppercase tracking-[0.18em] text-indigo-600">Seu próximo passo profissional</p><h1 className="mt-3 text-4xl font-black tracking-tight text-ink sm:text-6xl">Currículo alinhado à vaga,<br /><span className="text-indigo-600">sem inventar experiência.</span></h1><p className="mt-5 max-w-2xl text-lg leading-8 text-slate-500">Compare seu currículo com uma vaga, identifique lacunas e gere uma versão otimizada para sistemas ATS.</p></div><div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.8fr)_minmax(320px,1fr)]"><div className="space-y-4"><CandidateImportPanel loading={importState === "loading"} disabled={!candidateHydrated || !importReviewHydrated || analysisState === "loading"} success={importState === "success"} errorMessage={importError} issues={importIssues} reviewPaths={importReviewPaths} mappedSummary={importMappedSummary} missingSummary={importMissingSummary} storedResume={storedResume} onFileSelected={handleImport} onAcknowledgeReview={() => { setImportIssues([]); setImportReviewPaths([]); }} /><CandidateForm candidate={candidate} setCandidate={setCandidate} onClear={clearCandidate} /></div><div><JobForm job={job} setJob={setJob} onAnalyze={submit} onFetchJob={handleFetchJob} loading={analysisState === "loading"} fetching={jobFetchState === "loading"} fetchError={jobFetchError} fetchWarnings={jobFetchWarnings} disabled={!candidateHydrated || !importReviewHydrated || !jobHydrated || importState === "loading" || warningsPending} />{analysisState === "error" && <div role="alert" className="mt-3 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-800"><p className="font-bold">{validationIssues.length > 0 ? "Não foi possível analisar. Corrija os campos abaixo:" : "Não foi possível analisar os dados."}</p>{validationIssues.length > 0 ? <ul className="mt-2 list-disc space-y-1 pl-5">{validationIssues.map(issue => <li key={issue.path}>{issue.message}</li>)}</ul> : <p className="mt-1">{errorMessage}</p>}</div>}</div></div><div ref={resultRef}>{analysis ? <AnalysisResult analysis={analysis} /> : <EmptyAnalysisState />}</div></main></>;
+  return <><AppHeader /><main className="mx-auto max-w-[1400px] px-5 pb-16 pt-10 lg:px-10"><div className="mb-10 max-w-3xl"><StepIndicator step={analysisState === "success" ? 3 : 1} /><p className="mt-8 text-sm font-bold uppercase tracking-[0.18em] text-indigo-600">Seu próximo passo profissional</p><h1 className="mt-3 text-4xl font-black tracking-tight text-ink sm:text-6xl">Currículo alinhado à vaga,<br /><span className="text-indigo-600">sem inventar experiência.</span></h1><p className="mt-5 max-w-2xl text-lg leading-8 text-slate-500">Compare seu currículo com uma vaga, identifique lacunas e gere uma versão otimizada para sistemas ATS.</p></div><div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.8fr)_minmax(320px,1fr)]"><div className="space-y-4"><CandidateImportPanel loading={importState === "loading"} disabled={!candidateHydrated || !importReviewHydrated || analysisState === "loading"} success={importState === "success"} errorMessage={importError} issues={importIssues} reviewPaths={importReviewPaths} mappedSummary={importMappedSummary} missingSummary={importMissingSummary} storedResume={storedResume} onFileSelected={handleImport} onAcknowledgeReview={() => { setImportIssues([]); setImportReviewPaths([]); }} /><CandidateForm candidate={candidate} setCandidate={setCandidate} onClear={clearCandidate} /></div><div><JobForm job={job} setJob={setJob} onAnalyze={submit} onFetchJob={handleFetchJob} onImportFromClipboard={handleImportFromClipboard} loading={analysisState === "loading"} fetching={jobFetchState === "loading"} importing={browserImporting} fetchError={jobFetchError} browserImportError={browserImportError} fetchWarnings={jobFetchWarnings} disabled={!candidateHydrated || !importReviewHydrated || !jobHydrated || importState === "loading" || warningsPending} />{analysisState === "error" && <div role="alert" className="mt-3 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-800"><p className="font-bold">{validationIssues.length > 0 ? "Não foi possível analisar. Corrija os campos abaixo:" : "Não foi possível analisar os dados."}</p>{validationIssues.length > 0 ? <ul className="mt-2 list-disc space-y-1 pl-5">{validationIssues.map(issue => <li key={issue.path}>{issue.message}</li>)}</ul> : <p className="mt-1">{errorMessage}</p>}</div>}</div></div><div ref={resultRef}>{analysis ? <AnalysisResult analysis={analysis} /> : <EmptyAnalysisState />}</div></main></>;
 }
