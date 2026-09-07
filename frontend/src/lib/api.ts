@@ -13,6 +13,9 @@ export function parseApiError(status: number, body: ApiErrorBody | null): string
   if (status === 502 && body?.detail === "Backend indisponível.") return "Não foi possível conectar ao serviço de análise.";
   if (status === 503 && body?.detail === "AI configuration unavailable") return "A configuração da IA está incompleta. Defina RESUME_AI_API_KEY e RESUME_AI_MODEL no backend.";
   if (status === 502 && body?.detail === "AI integration failed") return "A IA recebeu os dados, mas não conseguiu gerar uma resposta. Tente novamente ou verifique o modelo configurado.";
+  if (status === 422 && typeof body?.detail === "string" && /criterion|evidence|grounding/i.test(body.detail)) {
+    return "A IA não conseguiu confirmar um requisito literalmente no texto da vaga. Cole somente a descrição completa da vaga e tente novamente.";
+  }
   if (status === 422) return typeof body?.detail === "string" ? body.detail : "Revise os campos obrigatórios ou inválidos.";
   if (status === 502 || status === 503) return "O serviço de análise está temporariamente indisponível.";
   return typeof body?.detail === "string" ? body.detail : "Não foi possível concluir a solicitação.";
