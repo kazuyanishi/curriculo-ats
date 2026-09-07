@@ -25,6 +25,7 @@ const issueMessages: Record<CandidateImportIssue["code"], string> = {
   unsupported_education_status: "Status de formação não reconhecido automaticamente.",
   unsupported_proficiency_level: "Nível de proficiência não reconhecido automaticamente.",
   unsupported_language_level: "Nível do idioma não reconhecido automaticamente.",
+  unsupported_grounding: "Este dado foi encontrado pelo modelo, mas não pôde ser confirmado literalmente no texto do currículo; revise ou preencha manualmente.",
 };
 
 function pathLabel(path: string): string {

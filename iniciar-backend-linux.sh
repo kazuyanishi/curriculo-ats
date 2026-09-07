@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
+export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
 AI_ENV_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/curriculo-ats/ai.env"
 if [[ -r "$AI_ENV_FILE" ]]; then
   set -a
