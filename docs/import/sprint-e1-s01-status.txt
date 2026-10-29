@@ -1,0 +1,67 @@
+SPRINT:
+E1-S01
+
+STATUS:
+PARTIAL
+
+REPOSITORY STATE PRESERVED:
+YES — master alinhada com origin/master; nenhum arquivo rastreado ou código de runtime alterado.
+
+SAMPLES REVIEWED:
+3 — S-REF-01 (descrição estrutural anonimizada; arquivo original indisponível), S-02 e S-03 (PDFs locais, avaliados anonimamente)
+
+NEW SAMPLES PENDING:
+YES — a validação com outras amostras e formatos ainda pode ampliar a cobertura.
+
+CURRENT CANDIDATE FIELDS INVENTORIED:
+40
+
+FIELDS:
+SUPPORTED: 21
+PARTIAL: 13
+MISSING: 7 lacunas adicionais
+AMBIGUOUS: 6
+
+OBJECTIVE / PROFESSIONAL SUMMARY / TARGET ROLE:
+MISSING / MISSING / MISSING
+
+EVIDENCE CONTRACT:
+PARTIAL
+
+NORMALIZATION RULES DOCUMENTED:
+YES
+
+BASELINE:
+PARTIAL
+
+AUTOMATED IMPORT:
+NOT EXECUTED — CONFIGURATION UNAVAILABLE (`RESUME_AI_API_KEY` e `RESUME_AI_MODEL` ausentes)
+
+PII COMMITTED OR DOCUMENTED:
+NO
+
+RUNTIME CODE CHANGED:
+NO
+
+FILES CREATED OR UPDATED:
+- docs/import/candidate-field-mapping.md
+- docs/import/import-baseline.md
+- docs/import/import-sample-matrix.md
+- docs/import/sprint-e1-s01-status.txt
+
+TESTS ADDED OR RUN:
+NO
+
+GIT DIFF REVIEW:
+PASS — nenhum arquivo rastreado ou código de runtime foi alterado; `docs/import/` permanece não rastreado, aguardando aprovação.
+
+RISKS AND OPEN DECISIONS:
+- Definir destinos para objetivo, resumo profissional e cargo-alvo.
+- Preservar evidência e valor bruto até a revisão.
+- Representar experiência atual sem confundi-la com data final ausente.
+- Separar cursos de certificações e representar seus status.
+- Executar o pipeline completo quando a configuração estiver disponível.
+- Revisar e aprovar `docs/import/` antes de adicioná-lo ao repositório.
+
+SPRINT E1-S01:
+PARTIAL — MAPEAMENTO E DOCUMENTAÇÃO PREPARADOS; PIPELINE COMPLETO E APROVAÇÃO DOS DOCUMENTOS PENDENTES
