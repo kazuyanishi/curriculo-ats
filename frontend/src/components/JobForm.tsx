@@ -1,8 +1,51 @@
 "use client";
 
+import { buildIndeedBookmarklet } from "../lib/indeedBrowserBridge";
 import { Job } from "../lib/types";
 import { Card, Field, PrimaryButton, TextArea } from "./ui";
 
-export function JobForm({ job, setJob, onAnalyze, loading, disabled = false }: { job: Job; setJob: (job: Job) => void; onAnalyze: () => void; loading: boolean; disabled?: boolean }) {
-  return <Card className="lg:sticky lg:top-6"><div className="mb-5"><h2 className="text-xl font-bold">Vaga desejada</h2><p className="mt-1 text-sm text-slate-500">Cole a descrição completa da vaga para uma análise mais precisa.</p></div><div className="space-y-4"><Field label="Título da vaga" placeholder="Backend Developer" value={job.title} onChange={v => setJob({ ...job, title: v })} /><Field label="Empresa" placeholder="Example Corp" value={job.company} onChange={v => setJob({ ...job, company: v })} /><Field label="Localização" placeholder="Remoto" value={job.location} onChange={v => setJob({ ...job, location: v })} /><Field label="URL" placeholder="https://empresa.com/vaga" value={job.source_url} onChange={v => setJob({ ...job, source_url: v })} /><TextArea label="Descrição da vaga" placeholder="Cole aqui os requisitos e responsabilidades..." className="min-h-[300px]" value={job.description} onChange={v => setJob({ ...job, description: v })} /><PrimaryButton disabled={loading || disabled} onClick={onAnalyze}>{loading ? "Analisando..." : <>Analisar compatibilidade <span aria-hidden>→</span></>}</PrimaryButton></div></Card>;
+type JobFormProps = {
+  job: Job;
+  setJob: (job: Job) => void;
+  onAnalyze: () => void;
+  onFetchJob: () => void;
+  onImportFromClipboard: () => void;
+  loading: boolean;
+  fetching?: boolean;
+  importing?: boolean;
+  fetchError?: string;
+  browserImportError?: string;
+  fetchWarnings?: string[];
+  disabled?: boolean;
+};
+
+export function JobForm({
+  job, setJob, onAnalyze, onFetchJob, onImportFromClipboard, loading,
+  fetching = false, importing = false, fetchError = "", browserImportError = "",
+  fetchWarnings = [], disabled = false,
+}: JobFormProps) {
+  const bookmarklet = buildIndeedBookmarklet();
+  return <Card className="lg:sticky lg:top-6">
+    <div className="mb-5"><h2 className="text-xl font-bold">Vaga desejada</h2><p className="mt-1 text-sm text-slate-500">Cole um link para preencher os dados automaticamente ou importe a vaga aberta no Firefox.</p></div>
+    <div className="space-y-4">
+      <div>
+        <Field label="URL da vaga" placeholder="https://empresa.com/vaga" value={job.source_url} onChange={v => setJob({ ...job, source_url: v })} />
+        <button type="button" disabled={fetching || loading || disabled || !job.source_url.trim()} onClick={onFetchJob} className="mt-2 w-full rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50">{fetching ? "Buscando dados da vaga..." : "Buscar dados pelo link"}</button>
+        {fetchError && <div role="alert" className="mt-2 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-sm text-rose-800"><p>{fetchError}</p><a href={job.source_url} target="_blank" rel="noreferrer" className="mt-2 inline-block font-bold underline">Abrir a vaga no navegador</a></div>}
+        {fetchWarnings.length > 0 && <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"><p className="font-semibold">Alguns dados precisam de confirmação:</p><ul className="mt-1 list-disc space-y-1 pl-5">{fetchWarnings.map(warning => <li key={warning}>{warning}</li>)}</ul></div>}
+      </div>
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+        <p className="font-semibold text-slate-800">Vaga aberta no Firefox?</p>
+        <p className="mt-1">Arraste este link para os favoritos e clique nele dentro da página do Indeed:</p>
+        <a href={bookmarklet} onClick={event => event.preventDefault()} draggable className="mt-2 inline-block cursor-grab font-bold text-indigo-700 underline">Copiar vaga do Indeed</a>
+        <button type="button" disabled={importing || loading || disabled} onClick={onImportFromClipboard} className="mt-3 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50">{importing ? "Importando vaga..." : "Importar vaga copiada"}</button>
+        {browserImportError && <p role="alert" className="mt-2 text-sm text-rose-700">{browserImportError}</p>}
+      </div>
+      <Field label="Título da vaga" placeholder="Backend Developer" value={job.title} onChange={v => setJob({ ...job, title: v })} />
+      <Field label="Empresa" placeholder="Example Corp" value={job.company} onChange={v => setJob({ ...job, company: v })} />
+      <Field label="Localização" placeholder="Remoto" value={job.location} onChange={v => setJob({ ...job, location: v })} />
+      <TextArea label="Descrição da vaga" placeholder="Cole aqui os requisitos e responsabilidades..." className="min-h-[300px]" value={job.description} onChange={v => setJob({ ...job, description: v })} />
+      <PrimaryButton disabled={loading || fetching || disabled} onClick={onAnalyze}>{loading ? "Analisando..." : <>Analisar compatibilidade <span aria-hidden>→</span></>}</PrimaryButton>
+    </div>
+  </Card>;
 }

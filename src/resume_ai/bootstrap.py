@@ -44,17 +44,31 @@ from resume_ai.modules.matching.infrastructure.semantic_refiner import (
 from resume_ai.modules.optimization.application.planning import BuildCandidateOptimizationPlan
 from resume_ai.modules.optimization.application.services import (
     AnalyzeCandidateForJob,
+    DeterministicCandidateAchievementOptimizationProposalApplier,
     DeterministicCandidateOptimizationProposalApplier,
+    DeterministicCandidateProjectOptimizationProposalApplier,
     GroundedCandidateOptimizer,
     GroundedStandaloneCandidateOptimizer,
     OptimizeCandidate,
 )
 from resume_ai.modules.optimization.domain.services import DeterministicCandidateOptimizer
+from resume_ai.modules.optimization.infrastructure import (
+    semantic_achievement_optimization_truth_gate,
+)
+from resume_ai.modules.optimization.infrastructure.contextual_achievement_optimizer import (
+    AIContextualAchievementOptimizer,
+)
 from resume_ai.modules.optimization.infrastructure.contextual_experience_optimizer import (
     AIContextualExperienceOptimizer,
 )
+from resume_ai.modules.optimization.infrastructure.contextual_project_optimizer import (
+    AIContextualProjectOptimizer,
+)
 from resume_ai.modules.optimization.infrastructure.semantic_optimization_truth_gate import (
     AISemanticOptimizationTruthGate,
+)
+from resume_ai.modules.optimization.infrastructure.semantic_project_optimization_truth_gate import (
+    AISemanticProjectOptimizationTruthGate,
 )
 
 
@@ -72,7 +86,10 @@ def build_load_job(config: AppConfig) -> LoadJob:
 
 def build_extract_job_criteria(config: AIConfig) -> ExtractJobCriteria:
     client = OpenAIStructuredAIClient(config)
-    extractor = AIJobCriteriaExtractor(client)
+    extractor = AIJobCriteriaExtractor(
+        client,
+        best_effort_grounding=config.model.casefold().startswith("gpt-"),
+    )
     truth_gate = JobCriteriaTruthGate()
     return ExtractJobCriteria(extractor, truth_gate)
 
@@ -101,6 +118,11 @@ def build_hybrid_match_candidate_to_job(config: AIConfig) -> MatchCandidateToJob
     return MatchCandidateToJob(
         HybridCandidateJobMatcher(deterministic_matcher, semantic_refiner),
         MatchingProvenanceGate(),
+        fallback_matcher=(
+            deterministic_matcher
+            if config.model.casefold().startswith("gpt-")
+            else None
+        ),
     )
 
 
@@ -120,12 +142,24 @@ def build_optimize_candidate() -> OptimizeCandidate:
 
 def build_grounded_optimize_candidate(config: AIConfig) -> OptimizeCandidate:
     client = OpenAIStructuredAIClient(config)
-    truth_gate = AISemanticOptimizationTruthGate(client)
-    experience_optimizer = AIContextualExperienceOptimizer(client, truth_gate)
+    activity_truth_gate = AISemanticOptimizationTruthGate(client)
+    achievement_truth_gate = (
+        semantic_achievement_optimization_truth_gate.AISemanticAchievementOptimizationTruthGate(
+            client
+        )
+    )
+    project_truth_gate = AISemanticProjectOptimizationTruthGate(client)
+    experience_optimizer = AIContextualExperienceOptimizer(client, activity_truth_gate)
+    achievement_optimizer = AIContextualAchievementOptimizer(client, achievement_truth_gate)
+    project_optimizer = AIContextualProjectOptimizer(client, project_truth_gate)
     grounded_optimizer = GroundedCandidateOptimizer(
         planner=BuildCandidateOptimizationPlan(MatchingProvenanceGate()),
         experience_optimizer=experience_optimizer,
+        achievement_optimizer=achievement_optimizer,
+        project_optimizer=project_optimizer,
         proposal_applier=DeterministicCandidateOptimizationProposalApplier(),
+        achievement_proposal_applier=DeterministicCandidateAchievementOptimizationProposalApplier(),
+        project_proposal_applier=DeterministicCandidateProjectOptimizationProposalApplier(),
         standalone_optimizer=GroundedStandaloneCandidateOptimizer(),
     )
     return OptimizeCandidate(grounded_optimizer)
