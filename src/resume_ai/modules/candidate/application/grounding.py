@@ -1,6 +1,14 @@
+import logging
+import re
+from typing import Any
+
 from resume_ai.modules.candidate.application.exceptions import (
     GroundingReason,
     ResumeCandidateGroundingError,
+)
+from resume_ai.modules.candidate.application.import_draft import (
+    CandidateImportIssue,
+    CandidateImportIssueCode,
 )
 from resume_ai.modules.candidate.application.import_schemas import (
     CandidateResumeExtraction,
@@ -15,6 +23,8 @@ from resume_ai.modules.candidate.application.import_schemas import (
     ExtractedProject,
     ResumeFieldEvidence,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class CandidateResumeTruthGate:
@@ -40,6 +50,90 @@ class CandidateResumeTruthGate:
         for index, project in enumerate(extraction.projects):
             self._validate_project(resume_text, project, f"projects[{index}]")
 
+    def validate_best_effort(
+        self, resume_text: str, extraction: CandidateResumeExtraction
+    ) -> tuple[CandidateResumeExtraction, tuple[CandidateImportIssue, ...]]:
+        """Keep grounded facts and report only facts that could not be verified.
+
+        A single hallucinated nested value must not discard an otherwise useful
+        resume. Invalid list items are removed; invalid scalar fields become
+        missing values and are surfaced as import issues for manual review.
+        """
+        current = extraction
+        issues: list[CandidateImportIssue] = []
+        seen_issue_paths: set[tuple[str, str]] = set()
+        for _ in range(100):
+            try:
+                self.validate(resume_text, current)
+                return current, tuple(issues)
+            except ResumeCandidateGroundingError as error:
+                logger.warning(
+                    "Candidate resume grounding discarded path=%s reason=%s "
+                    "whitespace_normalized_match=%s",
+                    error.path,
+                    error.reason,
+                    str(error.whitespace_normalized_match).lower(),
+                )
+                issue_key = (error.path, error.reason.value)
+                if issue_key not in seen_issue_paths:
+                    issues.append(
+                        CandidateImportIssue(
+                            path=error.path,
+                            code=CandidateImportIssueCode.UNSUPPORTED_GROUNDING,
+                        )
+                    )
+                    seen_issue_paths.add(issue_key)
+                updated = self._remove_untrusted_path(current, error.path)
+                if updated is current:
+                    raise
+                current = updated
+        raise RuntimeError("resume grounding did not converge")
+
+    @staticmethod
+    def _path_tokens(path: str) -> list[str | int]:
+        tokens: list[str | int] = []
+        for field, index in re.findall(r"([a-z_][a-z0-9_]*)|\[(\d+)\]", path):
+            tokens.append(field if field else int(index))
+        return tokens
+
+    @staticmethod
+    def _resolve(data: Any, tokens: list[str | int]) -> Any:
+        current = data
+        for token in tokens:
+            current = current[token]
+        return current
+
+    @staticmethod
+    def _mutable(value: Any) -> Any:
+        if isinstance(value, tuple):
+            return [CandidateResumeTruthGate._mutable(item) for item in value]
+        if isinstance(value, dict):
+            return {key: CandidateResumeTruthGate._mutable(item) for key, item in value.items()}
+        return value
+
+    @classmethod
+    def _remove_untrusted_path(
+        cls, extraction: CandidateResumeExtraction, path: str
+    ) -> CandidateResumeExtraction:
+        tokens = cls._path_tokens(path)
+        if not tokens:
+            return extraction
+        payload = cls._mutable(extraction.model_dump())
+        try:
+            # A named item without a grounded name is not a usable item at all.
+            if tokens[-1] == "name" and len(tokens) >= 2 and isinstance(tokens[-2], int):
+                collection = cls._resolve(payload, tokens[:-2])
+                collection.pop(tokens[-2])
+            elif isinstance(tokens[-1], int):
+                collection = cls._resolve(payload, tokens[:-1])
+                collection.pop(tokens[-1])
+            else:
+                parent = cls._resolve(payload, tokens[:-1])
+                parent[tokens[-1]] = None
+            return CandidateResumeExtraction.model_validate(payload)
+        except (KeyError, IndexError, TypeError, ValueError):
+            return extraction
+
     @staticmethod
     def _normalize_whitespace(value: str) -> str:
         return " ".join(value.split())
@@ -47,7 +141,9 @@ class CandidateResumeTruthGate:
     @classmethod
     def _validate_field(cls, resume_text: str, field: ResumeFieldEvidence, path: str) -> None:
         if field.value not in field.evidence:
-            raise ResumeCandidateGroundingError(path, GroundingReason.VALUE_NOT_IN_EVIDENCE)
+            raise ResumeCandidateGroundingError(
+                path, GroundingReason.VALUE_NOT_IN_EVIDENCE, raw_value=field.value
+            )
         if field.evidence not in resume_text:
             normalized_evidence = cls._normalize_whitespace(field.evidence)
             normalized_resume_text = cls._normalize_whitespace(resume_text)
@@ -56,6 +152,7 @@ class CandidateResumeTruthGate:
                     path,
                     GroundingReason.EVIDENCE_NOT_IN_RESUME_TEXT,
                     False,
+                    field.value,
                 )
 
     @classmethod

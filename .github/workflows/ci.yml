@@ -101,7 +101,8 @@ jobs:
           npm audit --audit-level=low
           npm audit --json > "$audit_file"
           node -e '
-            const audit = require(process.argv[1]);
+            const fs = require("node:fs");
+            const audit = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
             const vulnerabilities = audit.metadata.vulnerabilities;
             const severities = ["info", "low", "moderate", "high", "critical"];
             if (vulnerabilities.total !== 0 || severities.some((severity) => vulnerabilities[severity] !== 0)) {

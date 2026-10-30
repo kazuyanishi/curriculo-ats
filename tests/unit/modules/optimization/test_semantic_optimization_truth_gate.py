@@ -35,7 +35,7 @@ C = "experiences[1].activities[0].description"
 
 def candidate() -> Candidate:
     return Candidate(
-        PersonalInfo("Alex Example", "Example City", "PR", "Brazil"),
+        PersonalInfo("Alex Example", "Example City", "EX", "Example Country"),
         ContactInfo("alex@example.test", "+1 555 0100"),
         experiences=(
             Experience(

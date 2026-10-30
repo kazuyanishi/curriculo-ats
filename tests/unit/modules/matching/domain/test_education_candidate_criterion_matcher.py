@@ -25,7 +25,7 @@ from resume_ai.modules.matching.domain.services import EducationCandidateCriteri
 
 def _candidate(*education: Education) -> Candidate:
     return Candidate(
-        personal_info=PersonalInfo("Alex Example", "Example City", "PR", "Brazil"),
+        personal_info=PersonalInfo("Alex Example", "Example City", "EX", "Example Country"),
         contact_info=ContactInfo("alex@example.test", "+55"),
         education=education,
     )
