@@ -49,7 +49,7 @@ SKILL_PATH = "skills[1].name"
 
 def candidate() -> Candidate:
     return Candidate(
-        PersonalInfo("Alex Example", "Example City", "PR", "Brazil"),
+        PersonalInfo("Alex Example", "Example City", "EX", "Example Country"),
         ContactInfo("alex@example.test", "+1 555 0100"),
         experiences=(
             Experience(
@@ -368,7 +368,7 @@ def test_no_matches_skips_experience_ai_without_inventing_text() -> None:
 
 def test_unmatched_experience_activities_survive_the_real_grounded_pipeline() -> None:
     source = Candidate(
-        PersonalInfo("Alex Example", "Example City", "PR", "Brazil"),
+        PersonalInfo("Alex Example", "Example City", "EX", "Example Country"),
         ContactInfo("alex@example.test", "+1 555 0100"),
         experiences=(
             Experience(
@@ -406,7 +406,7 @@ def test_unmatched_experience_activities_survive_the_real_grounded_pipeline() ->
 
 def test_achievement_only_match_stays_standalone_without_experience_ai() -> None:
     source = Candidate(
-        PersonalInfo("Alex Example", "Example City", "PR", "Brazil"),
+        PersonalInfo("Alex Example", "Example City", "EX", "Example Country"),
         ContactInfo("alex@example.test", "+1 555 0100"),
         experiences=(
             Experience(

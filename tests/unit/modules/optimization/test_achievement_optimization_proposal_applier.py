@@ -23,7 +23,7 @@ from resume_ai.modules.optimization.application.services import (
 
 def candidate() -> Candidate:
     return Candidate(
-        PersonalInfo("Alex Example", "Example City", "PR", "Brazil"),
+        PersonalInfo("Alex Example", "Example City", "EX", "Example Country"),
         ContactInfo("alex@example.test", "+55"),
         experiences=(
             Experience(

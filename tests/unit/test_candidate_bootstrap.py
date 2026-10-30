@@ -24,8 +24,8 @@ def _minimum_json(name: str) -> str:
       "personal_info": {{
         "full_name": "{name}",
         "city": "Example City",
-        "state": "PR",
-        "country": "Brazil"
+        "state": "EX",
+        "country": "Example Country"
       }},
       "contact_info": {{
         "email": "alex@example.test",

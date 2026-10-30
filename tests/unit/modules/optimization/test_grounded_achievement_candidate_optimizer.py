@@ -21,7 +21,7 @@ from resume_ai.modules.optimization.application.services import GroundedCandidat
 
 def candidate() -> Candidate:
     return Candidate(
-        PersonalInfo("Alex Example", "Example City", "PR", "Brazil"),
+        PersonalInfo("Alex Example", "Example City", "EX", "Example Country"),
         ContactInfo("alex@example.test", "+55"),
     )
 
@@ -189,7 +189,7 @@ def test_pipeline_stops_before_later_stage_when_achievement_stage_fails(failure:
 def test_project_only_plan_always_invokes_project_optimizer_and_applier() -> None:
     events: list[str] = []
     source = Candidate(
-        PersonalInfo("Alex Example", "Example City", "PR", "Brazil"),
+        PersonalInfo("Alex Example", "Example City", "EX", "Example Country"),
         ContactInfo("alex@example.test", "+55"),
         projects=(Project("Resume AI", "Python application."),),
     )

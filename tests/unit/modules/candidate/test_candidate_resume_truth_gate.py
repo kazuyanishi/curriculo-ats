@@ -42,8 +42,8 @@ def test_entire_extraction_tree_and_nested_collections_are_validated() -> None:
     facts = [
         "Alex Example",
         "Example City",
-        "PR",
-        "Brazil",
+        "EX",
+        "Example Country",
         "alex@example.test",
         "+55",
         "linkedin.com/jane",
@@ -82,8 +82,8 @@ def test_entire_extraction_tree_and_nested_collections_are_validated() -> None:
         personal_info=ExtractedPersonalInfo(
             full_name=field("Alex Example"),
             city=field("Example City"),
-            state=field("PR"),
-            country=field("Brazil"),
+            state=field("EX"),
+            country=field("Example Country"),
         ),
         contact_info=ExtractedContactInfo(email=field("alex@example.test"), phone=field("+55")),
         professional_links=ExtractedProfessionalLinks(
