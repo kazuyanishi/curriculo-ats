@@ -19,8 +19,8 @@ def test_personal_info_input_accepts_valid_data_and_preserves_strings() -> None:
     schema = PersonalInfoInput(
         full_name="  Alex Example  ",
         city="  Example City  ",
-        state="PR",
-        country="Brazil",
+        state="EX",
+        country="Example Country",
     )
 
     assert schema.full_name == "  Alex Example  "
@@ -34,8 +34,8 @@ def test_personal_info_input_rejects_missing_field(field: str) -> None:
     values = {
         "full_name": "Alex Example",
         "city": "Example City",
-        "state": "PR",
-        "country": "Brazil",
+        "state": "EX",
+        "country": "Example Country",
     }
     values.pop(field)
 
@@ -49,8 +49,8 @@ def test_personal_info_input_rejects_blank_field(field: str, value: str) -> None
     values = {
         "full_name": "Alex Example",
         "city": "Example City",
-        "state": "PR",
-        "country": "Brazil",
+        "state": "EX",
+        "country": "Example Country",
     }
     values[field] = value
 
@@ -63,15 +63,15 @@ def test_personal_info_input_forbids_unknown_fields() -> None:
         PersonalInfoInput(
             full_name="Alex Example",
             city="Example City",
-            state="PR",
-            country="Brazil",
+            state="EX",
+            country="Example Country",
             unexpected="value",
         )
 
 
 def test_input_schema_is_frozen() -> None:
     schema = PersonalInfoInput(
-        full_name="Alex Example", city="Example City", state="PR", country="Brazil"
+        full_name="Alex Example", city="Example City", state="EX", country="Example Country"
     )
 
     with pytest.raises(ValidationError):

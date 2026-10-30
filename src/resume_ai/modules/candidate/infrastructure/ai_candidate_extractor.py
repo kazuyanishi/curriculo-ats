@@ -3,6 +3,9 @@ from resume_ai.modules.candidate.application.import_schemas import CandidateResu
 from resume_ai.modules.candidate.infrastructure.ai_candidate_prompts import (
     RESUME_CANDIDATE_EXTRACTION_SYSTEM_PROMPT,
 )
+from resume_ai.modules.candidate.infrastructure.resume_extraction_heuristics import (
+    enrich_extraction,
+)
 
 
 class AIResumeCandidateExtractor:
@@ -10,8 +13,9 @@ class AIResumeCandidateExtractor:
         self._client = client
 
     def extract(self, resume_text: str) -> CandidateResumeExtraction:
-        return self._client.generate(
+        extraction = self._client.generate(
             system_prompt=RESUME_CANDIDATE_EXTRACTION_SYSTEM_PROMPT,
             user_prompt=resume_text,
             response_model=CandidateResumeExtraction,
         )
+        return enrich_extraction(resume_text, extraction)

@@ -42,8 +42,8 @@ def _candidate(name: str) -> Candidate:
         personal_info=PersonalInfo(
             full_name=name,
             city="Example City",
-            state="PR",
-            country="Brazil",
+            state="EX",
+            country="Example Country",
         ),
         contact_info=ContactInfo(email="candidate@example.com", phone="+55"),
     )

@@ -3,7 +3,11 @@ from typing import Protocol
 from resume_ai.modules.candidate.domain.entities import Candidate
 from resume_ai.modules.matching.domain.entities import MatchingResult
 from resume_ai.modules.optimization.application.planning import CandidateOptimizationPlan
-from resume_ai.modules.optimization.application.proposals import CandidateOptimizationProposal
+from resume_ai.modules.optimization.application.proposals import (
+    CandidateAchievementOptimizationProposal,
+    CandidateOptimizationProposal,
+    CandidateProjectOptimizationProposal,
+)
 
 
 class CandidateExperienceOptimizer(Protocol):
@@ -13,6 +17,21 @@ class CandidateExperienceOptimizer(Protocol):
         matching: MatchingResult,
         plan: CandidateOptimizationPlan,
     ) -> CandidateOptimizationProposal: ...
+
+
+class CandidateAchievementOptimizer(Protocol):
+    def optimize(
+        self,
+        candidate: Candidate,
+        matching: MatchingResult,
+        plan: CandidateOptimizationPlan,
+    ) -> CandidateAchievementOptimizationProposal: ...
+
+
+class CandidateProjectOptimizer(Protocol):
+    def optimize(
+        self, candidate: Candidate, matching: MatchingResult, plan: CandidateOptimizationPlan
+    ) -> CandidateProjectOptimizationProposal: ...
 
 
 class CandidateOptimizer(Protocol):
@@ -44,4 +63,32 @@ class CandidateOptimizationProposalApplier(Protocol):
         self,
         candidate: Candidate,
         proposal: CandidateOptimizationProposal,
+    ) -> Candidate: ...
+
+
+class CandidateAchievementOptimizationTruthGate(Protocol):
+    def validate(
+        self,
+        candidate: Candidate,
+        proposal: CandidateAchievementOptimizationProposal,
+    ) -> None: ...
+
+
+class CandidateAchievementOptimizationProposalApplier(Protocol):
+    def apply(
+        self,
+        candidate: Candidate,
+        proposal: CandidateAchievementOptimizationProposal,
+    ) -> Candidate: ...
+
+
+class CandidateProjectOptimizationTruthGate(Protocol):
+    def validate(
+        self, candidate: Candidate, proposal: CandidateProjectOptimizationProposal
+    ) -> None: ...
+
+
+class CandidateProjectOptimizationProposalApplier(Protocol):
+    def apply(
+        self, candidate: Candidate, proposal: CandidateProjectOptimizationProposal
     ) -> Candidate: ...

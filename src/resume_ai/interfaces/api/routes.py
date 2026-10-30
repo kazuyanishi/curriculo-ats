@@ -151,8 +151,19 @@ def analyze(request: AnalyzeRequest, http_request: Request) -> AnalyzeResponse:
     try:
         result = build_analyze_candidate_for_job(ai_config).execute(candidate, job)
     except DomainError as error:
+        logger.warning(
+            "Candidate/job analysis rejected status=422 reason=%s",
+            str(error)[:500],
+        )
         raise HTTPException(status_code=422, detail=str(error)) from error
     except Exception as error:
+        logger.error(
+            "Candidate/job analysis AI integration failed exception_module=%s "
+            "exception_type=%s reason=%s",
+            type(error).__module__,
+            type(error).__name__,
+            str(error)[:500],
+        )
         raise HTTPException(status_code=502, detail="AI integration failed") from error
     return _analysis_response(result)
 

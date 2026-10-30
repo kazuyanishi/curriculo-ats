@@ -50,8 +50,13 @@ def candidate_extraction(reordered: bool = False) -> CandidateResumeExtraction:
         },
     ]
     technologies = [
-        {"name": {"value": "Python", "evidence": "Python"}},
-        {"name": {"value": "PostgreSQL", "evidence": "PostgreSQL"}},
+        {
+            "name": {
+                "value": "Spreadsheet Software",
+                "evidence": "Spreadsheet Software",
+            }
+        },
+        {"name": {"value": "SQL", "evidence": "SQL"}},
     ]
     if reordered:
         activities.reverse()
@@ -62,12 +67,12 @@ def candidate_extraction(reordered: bool = False) -> CandidateResumeExtraction:
                 "full_name": {"value": "Alex Example", "evidence": "Alex Example"},
                 "city": {"value": "Example City", "evidence": "Example City"},
                 "state": {"value": "Example State", "evidence": "Example State"},
-                "country": {"value": "Brasil", "evidence": "Brasil"},
+                "country": {"value": "Example Country", "evidence": "Example Country"},
             },
             "experiences": [
                 {
                     "company": {"value": "Sample Company", "evidence": "Sample Company"},
-                    "role": {"value": "Operations Specialist", "evidence": "Operations Specialist"},
+                    "role": {"value": "Inventory Assistant", "evidence": "Inventory Assistant"},
                     "activities": activities,
                 }
             ],
@@ -299,7 +304,12 @@ def test_result_file_contains_only_metrics(tmp_path) -> None:
     content = path.read_text(encoding="utf-8")
     payload = json.loads(content)
     assert payload["results"][0]["case_id"] == "synthetic_candidate_extraction"
-    for secret in ("Alex Example", "Sample Company", "Example City", "Knowledge of infrastructure"):
+    for secret in (
+        "Alex Example",
+        "Sample Company",
+        "Example City",
+        "Experience with inventory records",
+    ):
         assert secret not in content
 
 

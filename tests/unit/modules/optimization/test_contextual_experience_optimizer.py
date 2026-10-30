@@ -46,7 +46,7 @@ D = "experiences[2].activities[0].description"
 
 def candidate() -> Candidate:
     return Candidate(
-        personal_info=PersonalInfo("Alex Example", "Example City", "PR", "Brazil"),
+        personal_info=PersonalInfo("Alex Example", "Example City", "EX", "Example Country"),
         contact_info=ContactInfo("alex@example.test", "+1 555 0100"),
         experiences=(
             Experience(

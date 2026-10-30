@@ -21,7 +21,9 @@ from resume_ai.modules.optimization.application.planning import (
     CandidateOptimizationPlan,
 )
 from resume_ai.modules.optimization.application.proposals import (
+    CandidateAchievementOptimizationProposal,
     CandidateOptimizationProposal,
+    CandidateProjectOptimizationProposal,
 )
 from resume_ai.modules.optimization.application.services import (
     DeterministicCandidateOptimizationProposalApplier,
@@ -47,7 +49,7 @@ SKILL_PATH = "skills[1].name"
 
 def candidate() -> Candidate:
     return Candidate(
-        PersonalInfo("Alex Example", "Example City", "PR", "Brazil"),
+        PersonalInfo("Alex Example", "Example City", "EX", "Example Country"),
         ContactInfo("alex@example.test", "+1 555 0100"),
         experiences=(
             Experience(
@@ -106,6 +108,26 @@ class RecordingApplier:
         return self.output
 
 
+class EmptyAchievementOptimizer:
+    def optimize(self, candidate, matching, plan) -> CandidateAchievementOptimizationProposal:
+        return CandidateAchievementOptimizationProposal()
+
+
+class IdentityAchievementApplier:
+    def apply(self, candidate, proposal) -> Candidate:
+        return candidate
+
+
+class EmptyProjectOptimizer:
+    def optimize(self, candidate, matching, plan) -> CandidateProjectOptimizationProposal:
+        return CandidateProjectOptimizationProposal()
+
+
+class IdentityProjectApplier:
+    def apply(self, candidate, proposal) -> Candidate:
+        return candidate
+
+
 class RecordingStandaloneOptimizer:
     def __init__(self, output: Candidate, events: list[str]) -> None:
         self.output = output
@@ -134,8 +156,12 @@ def test_orchestrator_runs_in_order_with_original_inputs() -> None:
     output = GroundedCandidateOptimizer(
         planner,  # type: ignore[arg-type]
         experience_optimizer,  # type: ignore[arg-type]
+        EmptyAchievementOptimizer(),  # type: ignore[arg-type]
         applier,  # type: ignore[arg-type]
+        IdentityAchievementApplier(),  # type: ignore[arg-type]
         standalone,  # type: ignore[arg-type]
+        EmptyProjectOptimizer(),  # type: ignore[arg-type]
+        IdentityProjectApplier(),  # type: ignore[arg-type]
     ).optimize(source, matching_result)
 
     assert events == ["planner", "experience_optimizer", "applier", "standalone"]
@@ -185,8 +211,12 @@ def test_orchestrator_is_fail_closed(failing_stage: str) -> None:
         GroundedCandidateOptimizer(
             FailingPlanner(),  # type: ignore[arg-type]
             FailingExperienceOptimizer(),  # type: ignore[arg-type]
+            EmptyAchievementOptimizer(),  # type: ignore[arg-type]
             FailingApplier(),  # type: ignore[arg-type]
+            IdentityAchievementApplier(),  # type: ignore[arg-type]
             FailingStandaloneOptimizer(),  # type: ignore[arg-type]
+            EmptyProjectOptimizer(),  # type: ignore[arg-type]
+            IdentityProjectApplier(),  # type: ignore[arg-type]
         ).optimize(source, MatchingResult())
 
     assert (
@@ -234,8 +264,12 @@ def real_grounded_optimizer(client: FakeStructuredAIClient) -> GroundedCandidate
     return GroundedCandidateOptimizer(
         BuildCandidateOptimizationPlan(MatchingProvenanceGate()),
         AIContextualExperienceOptimizer(client, AISemanticOptimizationTruthGate(client)),
+        EmptyAchievementOptimizer(),
         DeterministicCandidateOptimizationProposalApplier(),
+        IdentityAchievementApplier(),
         GroundedStandaloneCandidateOptimizer(),
+        EmptyProjectOptimizer(),
+        IdentityProjectApplier(),
     )
 
 
@@ -334,7 +368,7 @@ def test_no_matches_skips_experience_ai_without_inventing_text() -> None:
 
 def test_unmatched_experience_activities_survive_the_real_grounded_pipeline() -> None:
     source = Candidate(
-        PersonalInfo("Alex Example", "Example City", "PR", "Brazil"),
+        PersonalInfo("Alex Example", "Example City", "EX", "Example Country"),
         ContactInfo("alex@example.test", "+1 555 0100"),
         experiences=(
             Experience(
@@ -372,7 +406,7 @@ def test_unmatched_experience_activities_survive_the_real_grounded_pipeline() ->
 
 def test_achievement_only_match_stays_standalone_without_experience_ai() -> None:
     source = Candidate(
-        PersonalInfo("Alex Example", "Example City", "PR", "Brazil"),
+        PersonalInfo("Alex Example", "Example City", "EX", "Example Country"),
         ContactInfo("alex@example.test", "+1 555 0100"),
         experiences=(
             Experience(

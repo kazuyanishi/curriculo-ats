@@ -1,148 +1,34 @@
-# Experience Matching Readiness
+# Cobertura do matching de experiência profissional
 
-## 1. Estado atual
-
-`Candidate` possui `experiences` como uma coleção de `Experience`. Cada
-experiência tem `role`, `company`, `start_date`, `end_date` opcional,
-`activities` e `achievements`.
-
-`ExperienceRequirement` pode declarar `role`, `company` e
-`minimum_duration`. O matching atual possui `ExactCandidateCriterionMatcher` e
-um matcher dedicado para Education, mas não possui matcher dedicado para
-Experience. Categorias sem matcher específico retornam `UNSUPPORTED`.
-
-O matching existente normaliza nomes com `strip().casefold()`. Não há contrato
-atual que defina cálculo determinístico de duração por datas.
-
-## 2. Role e company
-
-Role e company podem ser matched determinísticamente por igualdade normalizada.
-O subconjunto seguro é baseado somente no campo correspondente de
-`Candidate.Experience`:
-
-```text
-normalize(value) = value.strip().casefold()
-```
-
-Não são permitidos aliases, sinônimos, substring, fuzzy matching, NLP,
-embeddings ou LLM. Portanto `Software Eng.` não é equivalente a
-`Software Engineer`.
-
-## 3. Normalização
-
-A decisão é **STRIP_CASEFOLD**.
-
-Assim, `" Backend Developer "` e `"backend developer"` são iguais para o
-matching de role/company. Essa normalização serve apenas para igualdade
-determinística; não traduz, corrige, expande abreviações nem cria equivalências
-semânticas.
-
-## 4. Mesmo registro
-
-As dimensões role e company devem ser satisfeitas pelo **MESMO**
-`Candidate.Experience`.
-
-Isso evita combinar artificialmente o role de uma experiência com a company de
-outra. No exemplo com `Backend Developer` em `Other Corp` e `Example Corp` em
-`Operations Specialist`, o resultado é **NOT_MATCHED**. O requisito descreve um único
-registro de experiência com todas as dimensões declaradas.
-
-## 5. Duration
-
-O contrato atual não define com segurança inclusão ou exclusão das datas,
-tratamento de meses parciais, anos parciais, conversão entre years/months nem
-data de referência para `end_date=None`. Não deve ser criada uma fórmula nesta
-auditoria.
-
-```text
-Closed experience: NÂO SUPORTADO
-end_date=None: NÂO SUPORTADO
-Months: NÂO SUPORTADO
-Years: NÂO SUPORTADO
-```
-
-Qualquer `minimum_duration` deve permanecer fora do subconjunto seguro até que
-um contrato próprio defina essas regras. Não usar `today`, `datetime.now()` ou
-qualquer data implícita.
-
-## 6. Múltiplas experiências
-
-```text
-Somar períodos de experiências diferentes: NÃO DEFINIDO
-Tratar períodos sobrepostos: NÂO SUPORTADO
-Duração por role: NÂO SUPORTADO
-Duração por company: NÂO SUPORTADO
-```
-
-Não existe algoritmo contratado para soma, deduplicação, sobreposição ou
-atribuição de duração a role/company. Esses comportamentos não devem ser
-inferidos a partir das datas disponíveis.
-
-## 7. Activities e achievements
-
-Activities e achievements permanecem fora do matching de Experience. O matcher
-não deve comparar o requisito com `Activity.description` ou
-`Achievement.description`, nem usar esses textos como fallback para role,
-company ou duração.
-
-## 8. Casos obrigatórios
-
-| Caso | Resultado | Motivo |
+| Cenário | Resultado possível | Observação |
 |---|---|---|
-| role `Backend Developer` e role igual no candidato | MATCHED | Igualdade normalizada no mesmo Experience. |
-| Diferença somente de case/whitespace em role | MATCHED | Aplicação de `strip().casefold()`. |
-| Role e company satisfeitos no mesmo Experience | MATCHED | Todas as dimensões avaliáveis pertencem ao mesmo registro. |
-| Role em um Experience e company em outro | NOT_MATCHED | Não é permitido combinar registros diferentes. |
-| minimum_duration com experiência encerrada | UNSUPPORTED | Duração fechada ainda não tem fórmula contratada. |
-| minimum_duration com `end_date=None` | UNSUPPORTED | Não há data de referência nem política para experiência atual. |
-| Duas experiências curtas que juntas atingiriam a duração | UNSUPPORTED | Soma de experiências não está definida. |
-| EXPERIENCE sem `experience_requirement` | UNSUPPORTED | Não existe dimensão segura para avaliar. |
+| Cargo | `MATCHED` ou `NOT_MATCHED` | Igualdade normalizada |
+| Empresa | `MATCHED` ou `NOT_MATCHED` | Igualdade normalizada |
+| Cargo e empresa no mesmo registro | `MATCHED` ou `NOT_MATCHED` | Todos os campos devem coincidir juntos |
+| Duração de uma experiência encerrada | `MATCHED` ou `NOT_MATCHED` | Comparação em meses |
+| Experiência em andamento com duração mínima | `UNSUPPORTED` | Não há data de referência implícita |
+| Mais de um registro elegível para a duração | `UNSUPPORTED` | Períodos não são somados |
+| Requisito não estruturado | `UNSUPPORTED` | Texto livre não é interpretado |
+| Atividades ou conquistas | Fora do matching | Não são fallback de cargo ou empresa |
 
-Para um requisito com `role + minimum_duration`, o resultado do critério inteiro
-é `UNSUPPORTED`, mesmo que o role coincida. O matcher não deve retornar
-`MATCHED` parcialmente.
+## Normalização de texto
 
-## 9. Classificação
+Cargo e empresa passam por `strip().casefold()`. Essa regra trata apenas caixa
+e espaços nas extremidades. `Software Eng.` e `Software Engineer`, por exemplo,
+continuam diferentes.
 
-**B — existe subconjunto seguro, mas duration deve permanecer UNSUPPORTED.**
+## Registro único
 
-Role e company têm campos diretos em `Experience` e podem usar igualdade
-normalizada, desde que todas as dimensões declaradas sejam satisfeitas pelo
-mesmo registro. Duration não possui contrato suficiente para avaliação segura.
+Todas as dimensões de um requisito são avaliadas contra o mesmo objeto
+`Experience`. Essa regra impede a criação de uma correspondência artificial a
+partir de empregos diferentes.
 
-## 10. Menor implementação segura
+## Limites temporais
 
-A menor implementação futura é criar `ExperienceCandidateCriterionMatcher`,
-suportando somente:
+O sistema trabalha com `YearMonth`, portanto a unidade mínima disponível é o
+mês. Não existem dias parciais no contrato. Períodos de experiências diferentes
+não são somados e sobreposições não são deduplicadas.
 
-- `role`;
-- `company`;
-- igualdade `strip().casefold()`;
-- todas as dimensões avaliáveis no mesmo `Experience`;
-- `UNSUPPORTED` quando `experience_requirement is None`;
-- `UNSUPPORTED` quando `minimum_duration is not None`.
-
-`ExactCandidateCriterionMatcher` deve delegar a categoria `EXPERIENCE` ao
-serviço dedicado, como já delega Education. Não criar cálculo de duração,
-soma de experiências ou fallback por activities/achievements nessa
-implementação.
-
-## 11. Próxima sprint
-
-Implementar somente o matcher determinístico de Experience para role/company,
-mantendo qualquer `minimum_duration` como `UNSUPPORTED`. A implementação deve
-preservar a regra de mesmo registro e a normalização `strip().casefold()`.
-
-Conclusão:
-
-```text
-Classificação: B
-Role: STRIP_CASEFOLD
-Company: STRIP_CASEFOLD
-Mesmo registro: SIM
-Duration: NÂO SUPORTADO
-end_date=None: NÂO SUPORTADO
-Soma de experiências: NÃO DEFINIDO
-Activities/achievements: fora do matching
-Menor implementação segura: ExperienceCandidateCriterionMatcher para role/company; duration como UNSUPPORTED
-```
+Se a duração mínima estiver presente, uma única experiência precisa ser
+identificada por cargo e/ou empresa. Sem um registro único e encerrado, a
+decisão permanece `UNSUPPORTED`.
