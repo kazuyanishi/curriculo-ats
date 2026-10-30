@@ -15,6 +15,7 @@ class CandidateImportIssueCode(StrEnum):
     UNSUPPORTED_EDUCATION_STATUS = "unsupported_education_status"
     UNSUPPORTED_PROFICIENCY_LEVEL = "unsupported_proficiency_level"
     UNSUPPORTED_LANGUAGE_LEVEL = "unsupported_language_level"
+    UNSUPPORTED_GROUNDING = "unsupported_grounding"
 
 
 class _DraftSchema(BaseModel):

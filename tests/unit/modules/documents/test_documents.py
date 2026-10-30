@@ -37,11 +37,11 @@ from resume_ai.modules.documents.infrastructure.pdf_renderer import PdfCandidate
 def _candidate(*, complete: bool = True) -> Candidate:
     if not complete:
         return Candidate(
-            personal_info=PersonalInfo("Alex Example", "Example City", "PR", "Brazil"),
+            personal_info=PersonalInfo("Alex Example", "Example City", "EX", "Example Country"),
             contact_info=ContactInfo("alex@example.test", "+55"),
         )
     return Candidate(
-        personal_info=PersonalInfo("Alex Example", "Example City", "PR", "Brazil"),
+        personal_info=PersonalInfo("Alex Example", "Example City", "EX", "Example Country"),
         contact_info=ContactInfo("alex@example.test", "+55"),
         professional_links=ProfessionalLinks(linkedin="linkedin.com/jane"),
         experiences=(

@@ -3,12 +3,19 @@ from resume_ai.integrations.ai.config import AIConfig
 from resume_ai.modules.candidate.domain.entities import Candidate
 from resume_ai.modules.matching.domain.entities import MatchingResult
 from resume_ai.modules.optimization.application.services import (
+    DeterministicCandidateAchievementOptimizationProposalApplier,
     DeterministicCandidateOptimizationProposalApplier,
     GroundedCandidateOptimizer,
     GroundedStandaloneCandidateOptimizer,
     OptimizeCandidate,
 )
 from resume_ai.modules.optimization.domain.services import DeterministicCandidateOptimizer
+from resume_ai.modules.optimization.infrastructure import (
+    semantic_achievement_optimization_truth_gate,
+)
+from resume_ai.modules.optimization.infrastructure.contextual_achievement_optimizer import (
+    AIContextualAchievementOptimizer,
+)
 from resume_ai.modules.optimization.infrastructure.contextual_experience_optimizer import (
     AIContextualExperienceOptimizer,
 )
@@ -52,9 +59,18 @@ def test_bootstrap_builds_grounded_optimizer_without_calling_ai() -> None:
         service._optimizer._standalone_optimizer, GroundedStandaloneCandidateOptimizer
     )
     assert isinstance(service._optimizer._experience_optimizer, AIContextualExperienceOptimizer)
+    assert isinstance(service._optimizer._achievement_optimizer, AIContextualAchievementOptimizer)
     assert isinstance(
         service._optimizer._experience_optimizer._truth_gate, AISemanticOptimizationTruthGate
     )
     assert isinstance(
         service._optimizer._proposal_applier, DeterministicCandidateOptimizationProposalApplier
+    )
+    assert isinstance(
+        service._optimizer._achievement_proposal_applier,
+        DeterministicCandidateAchievementOptimizationProposalApplier,
+    )
+    assert isinstance(
+        service._optimizer._achievement_optimizer._truth_gate,
+        semantic_achievement_optimization_truth_gate.AISemanticAchievementOptimizationTruthGate,
     )
