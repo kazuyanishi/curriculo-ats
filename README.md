@@ -1,238 +1,184 @@
-# Resume AI / Currículo ATS
+# Currículo ATS
 
-Aplicação web para importar ou preencher um currículo, compará-lo com uma vaga e gerar uma versão otimizada para sistemas ATS. O projeto prioriza rastreabilidade: informações do candidato precisam ter evidência no currículo e a otimização não deve inventar experiência.
+Aplicação web para importar e editar currículos, comparar o perfil do candidato
+com uma vaga e gerar documentos em DOCX ou PDF.
 
-## Objetivo
+O matching diferencia critérios encontrados, ausentes e não avaliáveis. A
+otimização preserva a origem das informações do candidato e rejeita conteúdo
+sem evidência no currículo.
 
-Transformar os dados de um candidato e a descrição de uma vaga em uma análise clara de compatibilidade, com critérios encontrados, lacunas, critérios não avaliáveis, score, cobertura e currículo otimizado para download em DOCX ou PDF.
+## Recursos
 
-## Principais características
+- importação de currículos em PDF e DOCX;
+- formulário para revisão dos dados importados;
+- extração estruturada dos critérios de uma vaga;
+- matching com score, cobertura e análise de lacunas;
+- geração de currículo em DOCX e PDF;
+- validação de proveniência durante a extração e a otimização;
+- armazenamento local do formulário no navegador.
 
-- Importa currículo em PDF ou DOCX e preenche o formulário para revisão.
-- Extrai critérios da vaga, realiza matching e calcula score e cobertura.
-- Separa lacunas (`NOT_MATCHED`) de critérios não avaliáveis com segurança (`UNSUPPORTED`).
-- Gera currículo otimizado em DOCX e PDF a partir dos dados do candidato.
-- Mantém o currículo e os avisos de revisão no armazenamento local do navegador.
-- Usa gates de grounding, proveniência e Truth Gate para impedir que conteúdo sem evidência se torne experiência do candidato.
+## Tecnologias
 
-## Stack
-
-| Camada | Tecnologias principais |
-| --- | --- |
-| Backend | Python 3.13, FastAPI, Uvicorn, Pydantic, OpenAI SDK |
+| Componente | Tecnologias |
+|---|---|
+| Backend | Python 3.13, FastAPI, Pydantic e OpenAI SDK |
 | Documentos | python-docx, ReportLab e pypdf |
-| Frontend | Next.js 16.3.3, React 19.2.8, TypeScript 5.7.2 |
-| Estilos e qualidade | Tailwind CSS, PostCSS, ESLint 9.39.5 e eslint-config-next 16.3.3 |
+| Frontend | Next.js 16, React 19 e TypeScript 5 |
+| Qualidade | pytest, Ruff, Vitest e ESLint |
 
-## Arquitetura
-
-O backend usa módulos organizados por domínio e um bootstrap como composição das dependências:
+## Estrutura
 
 ```text
-src/resume_ai/
-├── core/              # configuração e exceções comuns
-├── integrations/      # cliente e configuração da IA
-├── interfaces/        # API FastAPI e CLI
-├── modules/
-│   ├── candidate/     # currículo, importação e grounding
-│   ├── documents/     # geração DOCX/PDF
-│   ├── jobs/          # vaga, critérios e Truth Gate da vaga
-│   ├── matching/      # matching, score, gaps e proveniência
-│   ├── optimization/  # plano e otimização grounded
-│   └── translation/   # tradução assistida por IA
-└── bootstrap.py        # composição dos casos de uso
+.
+├── src/resume_ai/       # backend Python
+│   ├── core/            # configuração e exceções comuns
+│   ├── integrations/    # integrações externas
+│   ├── interfaces/      # API HTTP e CLI
+│   └── modules/         # regras organizadas por domínio
+├── tests/               # testes do backend
+├── frontend/            # aplicação Next.js
+├── docs/                # documentação técnica
+└── pyproject.toml       # pacote e ferramentas do backend
 ```
 
-As regras e entidades ficam no domínio; casos de uso e orquestração ficam na aplicação; integrações externas ficam na infraestrutura; a API HTTP fica em `interfaces`. O frontend em `frontend/` é uma aplicação Next.js que expõe Route Handlers e encaminha chamadas ao FastAPI no servidor.
+O backend segue uma separação entre domínio, aplicação, infraestrutura e
+interfaces. O frontend possui dependências e configuração próprias em
+`frontend/package.json`.
 
 ## Pré-requisitos
 
-- Git;
-- Python 3.13 ou compatível com `>=3.13`;
-- Node.js **24.19.0**;
-- npm **11.17.0**.
-
-No frontend, `frontend/.nvmrc` é a referência operacional da versão do Node. `frontend/package.json` declara a mesma versão em `engines.node`, e `frontend/.npmrc` usa `engine-strict=true`.
+- Python 3.13 ou superior;
+- Node.js na versão indicada em `frontend/.nvmrc`;
+- npm compatível com a versão do Node.js;
+- Git.
 
 ## Instalação
 
-### Backend
-
-```powershell
-git clone https://github.com/kazuyanishi/curriculo-ats.git
-cd curriculo-ats
-
-python -m venv .venv
-```
-
-Ative o ambiente virtual conforme seu terminal:
-
-```powershell
-# Windows PowerShell
-.venv\Scripts\Activate.ps1
-
-# Windows CMD
-.venv\Scripts\activate.bat
-```
+Depois de clonar o repositório, prepare o backend na raiz:
 
 ```bash
-# Linux/macOS
+python -m venv .venv
 source .venv/bin/activate
-```
-
-Instale as dependências de desenvolvimento:
-
-```powershell
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-### Frontend
+No Windows PowerShell, ative o ambiente com:
 
 ```powershell
+.venv\Scripts\Activate.ps1
+```
+
+Instale o frontend separadamente:
+
+```bash
 cd frontend
 npm ci
 ```
 
-`npm ci` é o caminho recomendado porque instala exatamente a árvore registrada em `package-lock.json`.
-
 ## Configuração
 
-### OpenAI / IA
-
-Os fluxos de importação de currículo e análise de vaga exigem estas variáveis no processo do backend:
+Os fluxos que usam modelos externos leem estas variáveis no processo do
+backend:
 
 ```text
 RESUME_AI_API_KEY
 RESUME_AI_MODEL
 ```
 
-Exemplos, sempre com valores próprios e nunca versionando chaves:
+Não grave chaves no repositório. Defina-as somente no ambiente local ou no
+gerenciador de segredos da implantação.
 
-```powershell
-# PowerShell
-$env:RESUME_AI_API_KEY = "sua-chave"
-$env:RESUME_AI_MODEL = "seu-modelo"
-```
-
-```cmd
-:: Windows CMD
-set RESUME_AI_API_KEY=sua-chave
-set RESUME_AI_MODEL=seu-modelo
-```
+Exemplo para Linux e macOS:
 
 ```bash
-# Linux/macOS
 export RESUME_AI_API_KEY="sua-chave"
 export RESUME_AI_MODEL="seu-modelo"
 ```
 
-O backend lê variáveis do processo; ele **não** carrega arquivos `.env` automaticamente. `RESUME_AI_ENV` é opcional e aceita `development`, `test` ou `production` (o padrão é `development`).
-
-Para o frontend, `RESUME_AI_API_URL` é opcional e define a URL do FastAPI; o padrão é `http://127.0.0.1:8000`. O Next.js carrega `frontend/.env.local`, portanto é possível criar esse arquivo a partir do exemplo:
+Exemplo para PowerShell:
 
 ```powershell
-cd frontend
-Copy-Item .env.example .env.local
-```
-
-## Executando localmente
-
-Use dois terminais, ambos a partir da raiz do repositório.
-
-**Terminal 1 — backend**
-
-```powershell
-.venv\Scripts\Activate.ps1
 $env:RESUME_AI_API_KEY = "sua-chave"
 $env:RESUME_AI_MODEL = "seu-modelo"
+```
+
+O backend não carrega arquivos `.env` automaticamente. No frontend, copie
+`frontend/.env.example` para `frontend/.env.local` quando precisar alterar a
+URL do backend.
+
+## Execução local
+
+Inicie o backend a partir da raiz:
+
+```bash
 python -m uvicorn resume_ai.interfaces.api.app:create_app --factory --reload
 ```
 
-O backend inicia em <http://127.0.0.1:8000>. A documentação interativa está em <http://127.0.0.1:8000/docs>.
+A API estará disponível em <http://127.0.0.1:8000> e a documentação interativa
+em <http://127.0.0.1:8000/docs>.
 
-**Terminal 2 — frontend**
+Em outro terminal, inicie o frontend:
 
-```powershell
+```bash
 cd frontend
-npm ci
 npm run dev
 ```
 
-Abra <http://localhost:3000>.
+A interface estará disponível em <http://localhost:3000>.
 
-## API HTTP
+## API
 
-O FastAPI expõe os endpoints sob o prefixo `/api/v1`:
+| Método | Endpoint | Descrição |
+|---|---|---|
+| `GET` | `/api/v1/health` | Verifica a disponibilidade da API |
+| `POST` | `/api/v1/candidate/import` | Importa um currículo PDF ou DOCX |
+| `POST` | `/api/v1/analyze` | Analisa o candidato em relação à vaga |
+| `POST` | `/api/v1/documents/docx` | Gera o currículo em DOCX |
+| `POST` | `/api/v1/documents/pdf` | Gera o currículo em PDF |
 
-| Método | Endpoint | Finalidade |
-| --- | --- | --- |
-| `GET` | `/api/v1/health` | Verifica se a API está disponível. |
-| `POST` | `/api/v1/candidate/import` | Recebe um PDF ou DOCX (até 5 MiB), extrai e estrutura um rascunho de Candidate. |
-| `POST` | `/api/v1/analyze` | Executa extração de critérios, matching, score, gaps e otimização grounded. |
-| `POST` | `/api/v1/documents/docx` | Gera um currículo DOCX. |
-| `POST` | `/api/v1/documents/pdf` | Gera um currículo PDF. |
+## Matching
 
-O frontend chama seus Route Handlers em `/api/*`; eles encaminham as requisições ao FastAPI. Erros de configuração da IA retornam `503`; falhas de integração externa retornam `502`; e conteúdo ou dados que não passam pela validação necessária retornam `422` quando aplicável.
+Cada critério recebe um dos seguintes estados:
 
-O currículo importado e a vaga preenchida ficam salvos no `localStorage` do navegador. Assim, depois da primeira importação, é possível voltar à aplicação, ajustar uma vaga e executar novamente a análise e a otimização sem reenviar o arquivo. O frontend também expõe `POST /api/job/fetch`: ele lê título, empresa, localização e descrição de páginas de vagas que permitem acesso automático. Quando um site bloqueia a leitura ou não publica algum campo, o formulário informa exatamente o que faltou para preenchimento manual.
+- `MATCHED`: o currículo contém uma correspondência comprovada;
+- `NOT_MATCHED`: o critério foi avaliado e não foi encontrado;
+- `UNSUPPORTED`: os dados disponíveis não permitem uma decisão segura.
 
-## Fluxo da aplicação
+O score considera apenas critérios avaliáveis. A cobertura indica qual parcela
+do total pôde ser avaliada.
 
-1. Importe um currículo PDF/DOCX ou preencha o Candidate manualmente; os dados ficam salvos no navegador.
-2. Revise os dados importados e eventuais avisos.
-3. Cole o link da vaga e use a busca automática, completando manualmente os campos que o site não disponibilizar; também é possível colar a descrição diretamente.
-4. A IA estrutura critérios da vaga; o pipeline executa matching, score, cobertura e análise de gaps.
-5. A otimização grounded reorganiza apenas conteúdo sustentado por evidência do Candidate.
-6. Consulte correspondências, lacunas e critérios não avaliáveis; então baixe o Candidate otimizado em DOCX ou PDF.
-
-`MATCHED` representa um critério encontrado. `NOT_MATCHED` representa um critério avaliado e ausente. `UNSUPPORTED` significa que a avaliação não é segura com os dados disponíveis e não é tratado automaticamente como lacuna. O score usa critérios avaliáveis; a cobertura mostra a parcela de critérios avaliáveis sobre o total.
-
-## Grounding e Truth Gates
-
-O projeto não usa informações da vaga como prova de experiência do candidato. Evidências vêm do Candidate, o matching preserva a proveniência dessas evidências e a otimização só utiliza conteúdo vinculado a elas. Truth Gates rejeitam extrações ou propostas sem suporte suficiente, protegendo o currículo contra afirmações inventadas.
-
-## Testes e qualidade
+## Testes
 
 Backend:
 
-```powershell
+```bash
 python -m ruff check .
 python -m compileall -q src tests
 python -m pip check
 python -m pytest
 ```
 
-A baseline atual é **1293 testes passando**.
-
 Frontend:
 
-```powershell
+```bash
 cd frontend
-npm ci
-npm audit
-npm audit --omit=dev
+npm test
 npx tsc --noEmit
 npm run lint
 npm run build
+npm audit
 ```
 
-A árvore atual deve retornar **0 vulnerabilities** nos dois comandos de audit.
+O workflow em `.github/workflows/ci.yml` executa as verificações principais em
+pushes e pull requests para `master`.
 
-## CI e segurança
+## Dados locais
 
-O GitHub Actions executa em `ubuntu-24.04`:
+Currículos, documentos gerados, arquivos de ambiente e diretórios de trabalho
+local são ignorados pelo Git. Antes de publicar qualquer alteração, confirme os
+arquivos preparados com:
 
-- backend: Ruff, compileall, `pip check` e pytest;
-- frontend: verificação da toolchain, `npm ci`, security audit, TypeScript, ESLint e build;
-- etapa final: `CI Success` após backend e frontend.
-
-O Node 24.19.0 é baixado da distribuição oficial com verificação SHA-256. As actions usadas pelo workflow são pinadas por SHA e o checkout não mantém credenciais persistentes. Dependabot verifica semanalmente dependências de GitHub Actions e npm do frontend; não há auto-merge configurado.
-
-## Estado atual
-
-Estão implementados matching factual com proveniência, otimização grounded de activities, achievements de experiências e descrições de projetos com proveniência própria, Truth Gates semânticos, vínculo entre fontes e alvos da otimização e priorização grounded de itens independentes. O projeto não inclui autenticação, banco de dados, histórico de análises, candidatura automática a vagas ou ranking externo.
-
-## Licença
-
-Ainda não há um arquivo de licença definido no repositório.
+```bash
+git diff --cached --name-only
+```
