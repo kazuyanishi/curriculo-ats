@@ -17,8 +17,8 @@ def _candidate_payload() -> dict:
         "personal_info": {
             "full_name": "Alex Example",
             "city": "Example City",
-            "state": "PR",
-            "country": "Brazil",
+            "state": "EX",
+            "country": "Example Country",
         },
         "contact_info": {"email": "alex@example.test", "phone": "+55"},
     }

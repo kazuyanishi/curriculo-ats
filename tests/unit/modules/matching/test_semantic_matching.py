@@ -56,7 +56,7 @@ from resume_ai.modules.matching.infrastructure.semantic_refiner import (
 
 def candidate() -> Candidate:
     return Candidate(
-        personal_info=PersonalInfo("Alex Example", "Example City", "PR", "Brazil"),
+        personal_info=PersonalInfo("Alex Example", "Example City", "EX", "Example Country"),
         contact_info=ContactInfo("alex@example.test", "+55"),
         professional_links=ProfessionalLinks(github="github.example"),
         experiences=(

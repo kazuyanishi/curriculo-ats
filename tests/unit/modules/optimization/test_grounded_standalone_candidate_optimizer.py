@@ -29,7 +29,7 @@ from resume_ai.modules.optimization.application.services import GroundedStandalo
 
 def candidate() -> Candidate:
     return Candidate(
-        PersonalInfo("Alex Example", "Example City", "PR", "Brazil"),
+        PersonalInfo("Alex Example", "Example City", "EX", "Example Country"),
         ContactInfo("alex@example.test", "+1 555 0100"),
         experiences=(
             Experience(

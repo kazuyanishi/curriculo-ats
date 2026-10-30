@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useRef } from "react";
 import { CandidateImportIssue } from "../lib/types";
+import { StoredResumeMetadata } from "../lib/resumeStorage";
 import { Card, PrimaryButton } from "./ui";
 
 type CandidateImportPanelProps = {
@@ -11,6 +12,9 @@ type CandidateImportPanelProps = {
   errorMessage: string;
   issues: CandidateImportIssue[];
   reviewPaths: string[];
+  mappedSummary: string[];
+  missingSummary: string[];
+  storedResume: StoredResumeMetadata | null;
   onFileSelected: (file: File) => Promise<void>;
   onAcknowledgeReview: () => void;
 };
@@ -21,6 +25,7 @@ const issueMessages: Record<CandidateImportIssue["code"], string> = {
   unsupported_education_status: "Status de formação não reconhecido automaticamente.",
   unsupported_proficiency_level: "Nível de proficiência não reconhecido automaticamente.",
   unsupported_language_level: "Nível do idioma não reconhecido automaticamente.",
+  unsupported_grounding: "Este dado foi encontrado pelo modelo, mas não pôde ser confirmado literalmente no texto do currículo; revise ou preencha manualmente.",
 };
 
 function pathLabel(path: string): string {
@@ -38,7 +43,7 @@ function pathLabel(path: string): string {
   return `${names[collection] ?? collection} ${Number(index) + 1} · ${fields[field] ?? field}`;
 }
 
-export function CandidateImportPanel({ loading, disabled, success, errorMessage, issues, reviewPaths, onFileSelected, onAcknowledgeReview }: CandidateImportPanelProps) {
+export function CandidateImportPanel({ loading, disabled, success, errorMessage, issues, reviewPaths, mappedSummary, missingSummary, storedResume, onFileSelected, onAcknowledgeReview }: CandidateImportPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const hasWarnings = issues.length > 0 || reviewPaths.length > 0;
   const handleChange = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -46,5 +51,6 @@ export function CandidateImportPanel({ loading, disabled, success, errorMessage,
     event.target.value = "";
     if (file) await onFileSelected(file);
   };
-  return <Card><div className="mb-4"><h2 className="text-xl font-bold">Importar currículo</h2><p className="mt-1 text-sm text-slate-500">Envie um PDF ou DOCX para preencher o formulário automaticamente.</p><p className="mt-2 text-xs text-amber-700">Revise os dados importados antes de analisar a vaga. PDFs escaneados sem texto ainda não são suportados.</p></div><input ref={inputRef} type="file" accept=".pdf,.docx" aria-label="Selecionar currículo PDF ou DOCX" onChange={handleChange} disabled={loading || disabled} className="sr-only" /><PrimaryButton disabled={loading || disabled} onClick={() => inputRef.current?.click()}>{loading ? "Importando currículo..." : "Selecionar PDF ou DOCX"}</PrimaryButton>{errorMessage && <p role="alert" className="mt-3 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-sm text-rose-800">{errorMessage}</p>}{success && !errorMessage && <p role="status" className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">Currículo importado. Revise os campos antes de analisar.</p>}{hasWarnings && <div className="mt-4 space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><p className="font-semibold">Revise os campos indicados antes de analisar.</p><ul className="space-y-2">{issues.map((issue, index) => <li key={`${issue.path}-${index}`}><span className="font-semibold">{pathLabel(issue.path)}:</span> {issueMessages[issue.code]}{issue.raw_value ? ` Valor encontrado: "${issue.raw_value}"` : ""}</li>)}{reviewPaths.map(path => <li key={path}><span className="font-semibold">{pathLabel(path)}:</span> Confirme se esta experiência é um trabalho atual ou informe a data de término.</li>)}</ul><button type="button" onClick={onAcknowledgeReview} className="text-sm font-bold text-amber-800 underline">Marcar avisos como revisados</button></div>}</Card>;
+  const savedAt = storedResume ? new Date(storedResume.savedAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "";
+  return <Card><div className="mb-4"><h2 className="text-xl font-bold">Importar currículo</h2><p className="mt-1 text-sm text-slate-500">Envie um PDF ou DOCX uma vez. Os dados ficam salvos neste navegador e podem ser analisados novamente sem reenviar o arquivo.</p><p className="mt-2 text-xs text-amber-700">Os dados encontrados são preservados no formulário. O que não puder ser identificado aparece abaixo para preenchimento manual.</p></div>{storedResume && <p role="status" className="mb-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">Currículo salvo e pronto para reutilizar: <strong>{storedResume.fileName}</strong>{savedAt ? ` · salvo em ${savedAt}` : ""}.</p>}<input ref={inputRef} type="file" accept=".pdf,.docx" aria-label="Selecionar currículo PDF ou DOCX" onChange={handleChange} disabled={loading || disabled} className="sr-only" /><PrimaryButton disabled={loading || disabled} onClick={() => inputRef.current?.click()}>{loading ? "Importando currículo..." : storedResume ? "Substituir currículo salvo" : "Selecionar PDF ou DOCX"}</PrimaryButton>{errorMessage && <p role="alert" className="mt-3 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-sm text-rose-800">{errorMessage}</p>}{success && !errorMessage && <p role="status" className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">Currículo importado. Os dados encontrados já foram preenchidos abaixo.</p>}{success && mappedSummary.length > 0 && <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900"><p className="font-semibold">Dados encontrados</p><ul className="mt-2 grid gap-1 sm:grid-cols-2">{mappedSummary.map(item => <li key={item}>✓ {item}</li>)}</ul></div>}{success && missingSummary.length > 0 && <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><p className="font-semibold">Não identificado automaticamente</p><ul className="mt-2 grid gap-1 sm:grid-cols-2">{missingSummary.map(item => <li key={item}>• {item}</li>)}</ul></div>}{hasWarnings && <div className="mt-4 space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><p className="font-semibold">Revise os avisos antes de analisar.</p><ul className="space-y-2">{issues.map((issue, index) => <li key={`${issue.path}-${index}`}><span className="font-semibold">{pathLabel(issue.path)}:</span> {issueMessages[issue.code]}{issue.raw_value ? ` Valor encontrado: "${issue.raw_value}"` : ""}</li>)}{reviewPaths.map(path => <li key={path}><span className="font-semibold">{pathLabel(path)}:</span> Confirme se esta experiência é um trabalho atual ou informe a data de término.</li>)}</ul><button type="button" onClick={onAcknowledgeReview} className="text-sm font-bold text-amber-800 underline">Marcar avisos como revisados</button></div>}</Card>;
 }

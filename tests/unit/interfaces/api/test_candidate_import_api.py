@@ -185,18 +185,19 @@ def test_happy_path_accepts_pdf_and_docx_case_insensitively(
     assert "resume_text" not in response.text
 
 
-def test_grounding_failure_returns_stable_422(monkeypatch, caplog) -> None:
+def test_grounding_failure_returns_partial_draft_with_review_issue(monkeypatch, caplog) -> None:
     caplog.set_level("WARNING")
     response = _client(monkeypatch, HallucinatingOpenAIClient).post(
         "/api/v1/candidate/import",
         files={"file": ("resume.docx", _docx_bytes("Python"), "application/octet-stream")},
     )
 
-    assert response.status_code == 422
-    assert response.json() == {"detail": "Resume extraction could not be validated"}
-    assert "personal_info.full_name" not in response.text
+    assert response.status_code == 200
+    body = response.json()
+    assert body["personal_info"]["full_name"] is None
+    assert any(issue["path"] == "personal_info.full_name" for issue in body["issues"])
     assert "Kubernetes" not in response.text
-    assert "Python" not in response.text
+    assert body["technologies"][0]["name"] == "Python"
     assert any(
         "path=personal_info.full_name reason=evidence_not_in_resume_text" in record.message
         for record in caplog.records

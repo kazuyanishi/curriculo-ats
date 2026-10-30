@@ -55,8 +55,8 @@ def test_simple_values_are_literal_values_not_evidence() -> None:
         personal_info=ExtractedPersonalInfo(
             full_name=evidence("Alex Example"),
             city=evidence("Example City"),
-            state=evidence("PR"),
-            country=evidence("Brasil"),
+            state=evidence("EX"),
+            country=evidence("Example Country"),
         ),
         contact_info={"email": evidence("not-an-email"), "phone": evidence("+55")},
         professional_links={"github": evidence("github.com/jane")},

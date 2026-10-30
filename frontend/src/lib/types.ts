@@ -40,7 +40,8 @@ export type CandidateImportIssueCode =
   | "unsupported_date_format"
   | "unsupported_education_status"
   | "unsupported_proficiency_level"
-  | "unsupported_language_level";
+  | "unsupported_language_level"
+  | "unsupported_grounding";
 export type CandidateImportIssue = { path: string; code: CandidateImportIssueCode; raw_value: string | null };
 export type PersonalInfoDraft = { full_name: string | null; city: string | null; state: string | null; country: string | null };
 export type ContactInfoDraft = { email: string | null; phone: string | null };

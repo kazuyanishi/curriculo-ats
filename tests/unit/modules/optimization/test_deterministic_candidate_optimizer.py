@@ -27,7 +27,7 @@ from resume_ai.modules.optimization.domain.services import DeterministicCandidat
 
 def _candidate() -> Candidate:
     return Candidate(
-        personal_info=PersonalInfo("Alex Example", "Example City", "PR", "Brazil"),
+        personal_info=PersonalInfo("Alex Example", "Example City", "EX", "Example Country"),
         contact_info=ContactInfo("alex@example.test", "+55"),
         experiences=(
             Experience("Example Corp", "Backend Developer", YearMonth("2020-01")),

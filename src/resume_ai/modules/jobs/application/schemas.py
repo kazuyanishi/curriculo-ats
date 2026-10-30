@@ -195,6 +195,35 @@ class JobCriterionInput(_InputSchema):
     _validate_value = field_validator("value")(_require_non_blank)
     _validate_evidence = field_validator("evidence")(_require_non_blank)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_empty_nested_requirements(cls, value: object) -> object:
+        # Models occasionally return an empty object for an optional structured
+        # requirement. Treat it as omitted so one malformed criterion does not
+        # abort the complete job analysis.
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        for field, keys in (
+            (
+                "education_requirement",
+                (
+                    "degree_level", "field_of_study", "institution",
+                    "acceptable_statuses", "status_evidence",
+                ),
+            ),
+            (
+                "experience_requirement",
+                ("role", "company", "minimum_duration", "minimum_duration_evidence"),
+            ),
+        ):
+            nested = normalized.get(field)
+            if isinstance(nested, dict) and all(
+                nested.get(key) in (None, "", [], (), {}) for key in keys
+            ):
+                normalized[field] = None
+        return normalized
+
     @model_validator(mode="after")
     def _validate_education_requirement_category(self) -> "JobCriterionInput":
         if (

@@ -18,8 +18,10 @@ class ResumeCandidateGroundingError(Exception):
         path: str,
         reason: GroundingReason,
         whitespace_normalized_match: bool | None = None,
+        raw_value: str | None = None,
     ) -> None:
         self.path = path
         self.reason = reason
         self.whitespace_normalized_match = whitespace_normalized_match
+        self.raw_value = raw_value
         super().__init__("Candidate resume extraction is not grounded in source text")

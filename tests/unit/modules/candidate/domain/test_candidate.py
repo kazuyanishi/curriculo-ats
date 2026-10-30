@@ -24,7 +24,7 @@ from resume_ai.modules.candidate.domain.value_objects import YearMonth
 
 
 def _personal_info() -> PersonalInfo:
-    return PersonalInfo("Alex Example", "Example City", "PR", "Brazil")
+    return PersonalInfo("Alex Example", "Example City", "EX", "Example Country")
 
 
 def _contact_info() -> ContactInfo:

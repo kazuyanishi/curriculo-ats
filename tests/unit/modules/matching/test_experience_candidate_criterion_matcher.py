@@ -32,7 +32,7 @@ END_MONTH = YearMonth("2023-01")
 
 def _candidate(*experiences: Experience) -> Candidate:
     return Candidate(
-        personal_info=PersonalInfo("Alex Example", "Example City", "PR", "Brazil"),
+        personal_info=PersonalInfo("Alex Example", "Example City", "EX", "Example Country"),
         contact_info=ContactInfo("alex@example.test", "+55"),
         experiences=experiences,
     )
