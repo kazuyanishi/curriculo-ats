@@ -86,7 +86,10 @@ def build_load_job(config: AppConfig) -> LoadJob:
 
 def build_extract_job_criteria(config: AIConfig) -> ExtractJobCriteria:
     client = OpenAIStructuredAIClient(config)
-    extractor = AIJobCriteriaExtractor(client)
+    extractor = AIJobCriteriaExtractor(
+        client,
+        best_effort_grounding=config.model.casefold().startswith("gpt-"),
+    )
     truth_gate = JobCriteriaTruthGate()
     return ExtractJobCriteria(extractor, truth_gate)
 
@@ -115,6 +118,11 @@ def build_hybrid_match_candidate_to_job(config: AIConfig) -> MatchCandidateToJob
     return MatchCandidateToJob(
         HybridCandidateJobMatcher(deterministic_matcher, semantic_refiner),
         MatchingProvenanceGate(),
+        fallback_matcher=(
+            deterministic_matcher
+            if config.model.casefold().startswith("gpt-")
+            else None
+        ),
     )
 
 

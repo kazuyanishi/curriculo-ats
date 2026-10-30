@@ -27,7 +27,7 @@ PATH = "projects[0].description"
 
 def candidate() -> Candidate:
     return Candidate(
-        PersonalInfo("Jane", "Example City", "PR", "Brazil"),
+        PersonalInfo("Alex", "Example City", "EX", "Example Country"),
         ContactInfo("alex@example.test", "+55"),
         projects=(Project("API", "API em Python e FastAPI integrada ao PostgreSQL."),),
     )
@@ -90,7 +90,7 @@ def test_project_payload_is_minimal_and_response_is_grounded() -> None:
     assert payload["project_contexts"][0]["candidate_evidence"] == [
         {"path": PATH, "text": candidate().projects[0].description}
     ]
-    assert "Jane" not in client.calls[0]["user_prompt"]
+    assert "Alex" not in client.calls[0]["user_prompt"]
     assert proposal.projects[0].description is not None
     assert gate.calls[0][1] is proposal
 

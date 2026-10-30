@@ -7,6 +7,9 @@ from resume_ai.modules.candidate.infrastructure.ai_candidate_extractor import (
 from resume_ai.modules.candidate.infrastructure.ai_candidate_prompts import (
     RESUME_CANDIDATE_EXTRACTION_SYSTEM_PROMPT,
 )
+from resume_ai.modules.candidate.infrastructure.resume_extraction_heuristics import (
+    enrich_extraction,
+)
 
 
 class FakeStructuredAIClient:
@@ -64,3 +67,37 @@ def test_extractor_propagates_client_error() -> None:
         assert str(error) == "AI failure"
     else:
         raise AssertionError("expected RuntimeError")
+
+
+def test_enrichment_recovers_technical_and_course_sections() -> None:
+    extraction = enrich_extraction(
+        """COMPETÊNCIAS TÉCNICAS
+- Python
+- FastAPI
+- Git e GitHub
+PROJETOS DE DESENVOLVIMENTO
+PROJETO: Sistema ERP
+- Versão desktop desenvolvida com Python e PySide6.
+CURSOS COMPLEMENTARES
+- Python - Udemy - Concluído
+""",
+        CandidateResumeExtraction(
+            skills=(
+                {
+                    "name": {"value": "Python", "evidence": "- Python"},
+                },
+            ),
+            projects=(
+                {
+                    "name": {"value": "Sistema ERP", "evidence": "PROJETO: Sistema ERP"},
+                },
+            ),
+        ),
+    )
+
+    assert [item.name.value for item in extraction.skills] == []
+    assert {item.name.value for item in extraction.technologies} >= {"Python", "FastAPI"}
+    assert {item.name.value for item in extraction.tools} >= {"Git", "GitHub"}
+    assert extraction.certifications[0].name.value == "Python"
+    assert extraction.certifications[0].issuer.value == "Udemy"
+    assert {item.value for item in extraction.projects[0].technologies} >= {"Python", "PySide6"}

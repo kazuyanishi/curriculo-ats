@@ -57,7 +57,7 @@ SYNTHETIC_RESUME_TEXT = """Alex Example
 Example City - Example State - Example Country
 
 EMPRESA: Sample Company
-CARGO: Operations Specialist
+CARGO: Inventory Assistant
 PERÍODO: 01/2024 - Atual
 - Registro e organização de inventário.
 - Preparação de relatórios semanais.
@@ -68,8 +68,8 @@ Example University
 Em andamento
 
 Tecnologias:
-Python
-PostgreSQL
+Spreadsheet Software
+SQL
 """
 
 SYNTHETIC_JOB_TEXT = """Requirements:
@@ -179,7 +179,7 @@ def _candidate_fact_score(extraction: CandidateResumeExtraction) -> float:
             if item.company is not None
             and item.company.value == "Sample Company"
             and item.role is not None
-            and item.role.value == "Operations Specialist"
+            and item.role.value == "Inventory Assistant"
         ),
         None,
     )
@@ -191,7 +191,7 @@ def _candidate_fact_score(extraction: CandidateResumeExtraction) -> float:
         extraction.personal_info.state is not None
         and extraction.personal_info.state.value == "Example State",
         extraction.personal_info.country is not None
-        and extraction.personal_info.country.value == "Brasil",
+        and extraction.personal_info.country.value == "Example Country",
         any(
             item.company is not None and item.company.value == "Sample Company"
             for item in extraction.experiences
@@ -200,7 +200,7 @@ def _candidate_fact_score(extraction: CandidateResumeExtraction) -> float:
             item.company is not None
             and item.company.value == "Sample Company"
             and item.role is not None
-            and item.role.value == "Operations Specialist"
+            and item.role.value == "Inventory Assistant"
             for item in extraction.experiences
         ),
         experience is not None
@@ -213,24 +213,27 @@ def _candidate_fact_score(extraction: CandidateResumeExtraction) -> float:
             and education.course.value == "Sample Degree Program"
             for education in extraction.education
         ),
-        any(technology.name.value == "Python" for technology in extraction.technologies),
+        any(
+            technology.name.value == "Spreadsheet Software"
+            for technology in extraction.technologies
+        ),
     )
     return sum(facts) / len(facts)
 
 
 def _synthetic_semantic_candidate() -> Candidate:
     return Candidate(
-        personal_info=PersonalInfo("Alex Example", "Example City", "PR", "Brazil"),
+        personal_info=PersonalInfo("Alex Example", "Example City", "EX", "Example Country"),
         contact_info=ContactInfo("alex@example.test", "+1 555 0100"),
         experiences=(
             Experience(
                 "Sample Company",
-                "Operations Specialist",
+                "Inventory Assistant",
                 YearMonth("2020-01"),
                 YearMonth("2024-01"),
                 activities=(
                     Activity("Maintained inventory records and task status in SampleBoard."),
-                    Activity("Atualização de tarefas no SampleBoard."),
+                    Activity("Prepared weekly operational reports with spreadsheet software."),
                     Activity("Reconciled stock discrepancies."),
                 ),
             ),

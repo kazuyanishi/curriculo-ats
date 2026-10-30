@@ -1,27 +1,54 @@
-# ============================================================
-# Resume AI - Local / Sensitive Data
-# ============================================================
+# Local configuration and sensitive data
 
 # Environment variables
 .env
 .env.*
-!frontend/.env.example
 *.env
+!frontend/.env.example
 
-# Frontend local dependencies and build output
+# JavaScript dependencies and build output
+node_modules/
 frontend/node_modules/
+.next/
 frontend/.next/
+out/
+.turbo/
+coverage/
+node_modules.*backup*/
+.next.*backup*/
 
-# Local sensitive data
-data/
-output/
-private/
-secrets/
-credentials/
+# Local data and generated output
+/data/
+/output/
+/uploads/
+/exports/
+/artifacts/
+/private/
+/secrets/
+/credentials/
+/docs/import/
+/alterados/
+/alterados.zip
 
-# ============================================================
+# Local launch and dependency files
+/iniciar-backend-linux.sh
+/iniciar-frontend-linux.sh
+/requirements-linux.lock.txt
+
+# Candidate documents and generated files
+*.pdf
+*.doc
+*.docx
+*.odt
+*.rtf
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+
 # Local databases
-# ============================================================
 
 *.db
 *.sqlite
@@ -39,21 +66,18 @@ credentials/
 *.sqlite3-wal
 *.sqlite3-shm
 
-# ============================================================
-# Credentials / Certificates
-# ============================================================
-
+# Credentials and certificates
 *.pem
 *.key
 *.p12
 *.pfx
 *.crt
 *.cer
+*.jks
+*.keystore
+*.kdbx
 
-# ============================================================
 # Python
-# ============================================================
-
 __pycache__/
 *.py[cod]
 *$py.class
@@ -64,46 +88,40 @@ venv/
 env/
 ENV/
 
-# ============================================================
-# Tests / Coverage / Linters
-# ============================================================
-
+# Tests, coverage and linters
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
 .pyright/
+.hypothesis/
+.tox/
+.nox/
 
 .coverage
 .coverage.*
 htmlcov/
 coverage.xml
 
-# ============================================================
 # Python build
-# ============================================================
-
 build/
 dist/
 *.egg-info/
 .eggs/
 
-# ============================================================
-# IDE
-# ============================================================
-
+# Editors and local assistants
 .vscode/
+.idea/
+.fleet/
+.history/
+.codex/
+.claude/
+*.code-workspace
 
-# ============================================================
 # Logs
-# ============================================================
-
 *.log
 logs/
 
-# ============================================================
 # Temporary files
-# ============================================================
-
 *.tmp
 *.temp
 *.bak
@@ -111,16 +129,10 @@ logs/
 *.swo
 *~
 
-# ============================================================
 # Jupyter
-# ============================================================
-
 .ipynb_checkpoints/
 
-# ============================================================
 # Operating system
-# ============================================================
-
 .DS_Store
 Thumbs.db
 Desktop.ini

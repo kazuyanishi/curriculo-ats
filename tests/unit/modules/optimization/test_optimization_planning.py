@@ -52,7 +52,7 @@ def candidate() -> Candidate:
         for index in range(3)
     )
     return Candidate(
-        personal_info=PersonalInfo("Alex Example", "Example City", "PR", "Brazil"),
+        personal_info=PersonalInfo("Alex Example", "Example City", "EX", "Example Country"),
         contact_info=ContactInfo("alex@example.test", "+55"),
         experiences=experiences,
         education=(Education("Example University", "Computer Science", EducationStatus.COMPLETED),),

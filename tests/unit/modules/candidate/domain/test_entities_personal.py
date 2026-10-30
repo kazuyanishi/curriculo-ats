@@ -14,14 +14,14 @@ def test_personal_info_accepts_valid_data() -> None:
     info = PersonalInfo(
         full_name="Alex Example",
         city="Example City",
-        state="PR",
-        country="Brazil",
+        state="EX",
+        country="Example Country",
     )
 
     assert info.full_name == "Alex Example"
     assert info.city == "Example City"
-    assert info.state == "PR"
-    assert info.country == "Brazil"
+    assert info.state == "EX"
+    assert info.country == "Example Country"
 
 
 @pytest.mark.parametrize("field", ["full_name", "city", "state", "country"])
@@ -30,8 +30,8 @@ def test_personal_info_rejects_empty_required_fields(field: str, value: str) -> 
     values = {
         "full_name": "Alex Example",
         "city": "Example City",
-        "state": "PR",
-        "country": "Brazil",
+        "state": "EX",
+        "country": "Example Country",
     }
     values[field] = value
 
@@ -75,7 +75,7 @@ def test_professional_links_reject_informed_empty_values(field: str, value: str)
 
 
 def test_personal_info_is_immutable() -> None:
-    info = PersonalInfo("Alex Example", "Example City", "PR", "Brazil")
+    info = PersonalInfo("Alex Example", "Example City", "EX", "Example Country")
 
     with pytest.raises(FrozenInstanceError):
         info.full_name = "John Example"
