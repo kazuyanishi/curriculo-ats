@@ -170,9 +170,6 @@ npm run build
 npm audit
 ```
 
-O workflow em `.github/workflows/ci.yml` executa as verificações principais em
-pushes e pull requests para `master`.
-
 ## Dados locais
 
 Currículos, documentos gerados, arquivos de ambiente e diretórios de trabalho
