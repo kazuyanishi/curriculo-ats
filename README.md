@@ -169,13 +169,3 @@ npm run lint
 npm run build
 npm audit
 ```
-
-## Dados locais
-
-Currículos, documentos gerados, arquivos de ambiente e diretórios de trabalho
-local são ignorados pelo Git. Antes de publicar qualquer alteração, confirme os
-arquivos preparados com:
-
-```bash
-git diff --cached --name-only
-```
